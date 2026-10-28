@@ -1,0 +1,14 @@
+# 系统文件 / OS files
+.DS_Store
+Thumbs.db
+
+# 编辑器 / Editor
+.vscode/
+.idea/
+
+# 日志与临时文件 / Logs & temp
+*.log
+*.tmp
+
+# Trae 编辑器临时目录 / Trae editor temp
+.trae-html-share-packages/

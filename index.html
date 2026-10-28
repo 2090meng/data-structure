@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>数据结构内存可视化 / Data Structure Memory Visualizer</title>
+  <link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+  <!-- 顶部标题栏 -->
+  <header class="topbar">
+    <h1 class="title">
+      <span class="zh">数据结构内存动态演示</span>
+      <span class="en">Data Structure Memory Visualizer</span>
+    </h1>
+    <div class="toolbar">
+      <label class="toolbar__label zh" for="lang-select">语言</label>
+      <label class="toolbar__label en" for="lang-select">Language</label>
+      <select id="lang-select">
+        <option value="zh">中文</option>
+        <option value="en">English</option>
+      </select>
+    </div>
+  </header>
+
+  <main class="layout">
+    <!-- 左侧：操作面板 -->
+    <aside class="panel">
+      <details class="panel__help" open>
+        <summary>
+          <span class="zh">使用说明（第一次请先看这里）</span>
+          <span class="en">How to use (read this first)</span>
+        </summary>
+        <ol class="help-list">
+          <li><span class="zh">先在右上角选择语言。</span><span class="en">Pick a language at the top-right.</span></li>
+          <li><span class="zh">在左侧选择数据结构（目前仅「数组 Array」可用）。</span><span class="en">Choose a data structure (only Array is available for now).</span></li>
+          <li><span class="zh">选择操作：插入(Insert)、删除(Delete)、查找(Search)。</span><span class="en">Pick an operation: insert, delete, or search.</span></li>
+          <li><span class="zh">填参数：插入/删除填「下标」，插入/查找填「值」。</span><span class="en">Fill parameters: index for insert/delete, value for insert/search.</span></li>
+          <li><span class="zh">先点「执行」生成动画步骤，再点「单步执行」逐帧看，或点「自动播放」连续播放。</span><span class="en">Click "Execute" to generate steps, then "Step" to advance one by one, or "Play" to auto-run.</span></li>
+          <li><span class="zh">观察右侧内存块的地址与值变化，配合下方日志理解每一步。</span><span class="en">Watch the memory block addresses/values on the right, with the log below.</span></li>
+          <li><span class="zh">点「重置」清空并恢复初始状态。</span><span class="en">Click "Reset" to clear and restart.</span></li>
+        </ol>
+      </details>
+
+      <section class="panel__section">
+        <h2 class="panel__title zh">1. 选择数据结构</h2>
+        <h2 class="panel__title en">1. Choose data structure</h2>
+        <select id="structure-select">
+          <option value="array">数组 Array</option>
+          <option value="linkedlist" disabled>链表 Linked List (开发中)</option>
+          <option value="stack" disabled>栈 Stack (开发中)</option>
+          <option value="queue" disabled>队列 Queue (开发中)</option>
+          <option value="binarytree" disabled>二叉树 Binary Tree (开发中)</option>
+        </select>
+      </section>
+
+      <section class="panel__section">
+        <h2 class="panel__title zh">2. 输入操作</h2>
+        <h2 class="panel__title en">2. Operation</h2>
+
+        <div class="field">
+          <label class="field__label zh" for="op-select">操作</label>
+          <label class="field__label en" for="op-select">Operation</label>
+          <select id="op-select">
+            <option value="insert">插入 Insert</option>
+            <option value="delete">删除 Delete</option>
+            <option value="search">查找 Search</option>
+          </select>
+        </div>
+
+        <div class="field" id="index-field">
+          <label class="field__label zh" for="index-input">下标 index</label>
+          <label class="field__label en" for="index-input">Index</label>
+          <input id="index-input" type="number" min="0" value="0" />
+        </div>
+
+        <div class="field" id="value-field">
+          <label class="field__label zh" for="value-input">值 value</label>
+          <label class="field__label en" for="value-input">Value</label>
+          <input id="value-input" type="number" value="1" />
+        </div>
+
+        <button id="execute-btn" class="btn btn--primary">
+          <span class="zh">执行</span><span class="en">Execute</span>
+        </button>
+      </section>
+
+      <section class="panel__section">
+        <h2 class="panel__title zh">3. 播放控制</h2>
+        <h2 class="panel__title en">3. Playback</h2>
+        <div class="btn-group">
+          <button id="step-btn" class="btn">
+            <span class="zh">单步执行</span><span class="en">Step</span>
+          </button>
+          <button id="play-btn" class="btn">
+            <span class="zh">自动播放</span><span class="en">Play</span>
+          </button>
+          <button id="reset-btn" class="btn btn--danger">
+            <span class="zh">重置</span><span class="en">Reset</span>
+          </button>
+        </div>
+      </section>
+
+      <section class="panel__section panel__legend">
+        <h2 class="panel__title zh">图例</h2>
+        <h2 class="panel__title en">Legend</h2>
+        <ul class="legend">
+          <li><span class="swatch swatch--alloc"></span><span class="zh">已分配内存（存储元素）</span><span class="en">Allocated memory</span></li>
+          <li><span class="swatch swatch--free"></span><span class="zh">空闲内存</span><span class="en">Free memory</span></li>
+          <li><span class="swatch swatch--hl"></span><span class="zh">当前操作位置</span><span class="en">Current operation</span></li>
+        </ul>
+      </section>
+    </aside>
+
+    <!-- 右侧：内存可视化 + 日志 -->
+    <section class="visual">
+      <div class="visual__canvas">
+        <svg id="memory-svg" xmlns="http://www.w3.org/2000/svg"></svg>
+      </div>
+      <div class="log">
+        <div class="log__header">
+          <span class="zh">执行日志</span>
+          <span class="en">Execution Log</span>
+        </div>
+        <ul id="log-list"></ul>
+      </div>
+    </section>
+  </main>
+
+  <script type="module" src="js/main.js"></script>
+</body>
+</html>

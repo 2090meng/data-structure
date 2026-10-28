@@ -1,0 +1,345 @@
+/* ============================================================
+   全局样式 / Global styles
+   ============================================================ */
+:root {
+  --bg: #0f172a;
+  --panel-bg: #1e293b;
+  --border: #334155;
+  --text: #e2e8f0;
+  --text-dim: #94a3b8;
+  --accent: #38bdf8;
+  --alloc: #3b82f6;      /* 已分配内存块颜色 */
+  --free: #64748b;       /* 空闲内存颜色（灰） */
+  --highlight: #f59e0b;  /* 当前操作高亮 */
+  --hit: #10b981;        /* 查找命中 */
+  --danger: #ef4444;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html, body {
+  margin: 0;
+  height: 100%;
+  font-family: "Segoe UI", "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+}
+
+/* 顶部标题栏 / Top bar */
+.topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 20px;
+  background: var(--panel-bg);
+  border-bottom: 1px solid var(--border);
+}
+
+.topbar .title {
+  font-size: 18px;
+  margin: 0;
+  font-weight: 600;
+}
+
+.toolbar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--text-dim);
+  font-size: 14px;
+}
+
+/* 主布局：左面板 + 右可视化 / Layout */
+.layout {
+  display: grid;
+  grid-template-columns: 320px 1fr;
+  gap: 16px;
+  padding: 16px;
+  height: calc(100vh - 65px);
+}
+
+/* 左侧操作面板 / Side panel */
+.panel {
+  background: var(--panel-bg);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 16px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.panel__section {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.panel__title {
+  font-size: 14px;
+  margin: 0;
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.field__label {
+  font-size: 12px;
+  color: var(--text-dim);
+}
+
+select, input {
+  background: #0f172a;
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 8px 10px;
+  font-size: 14px;
+  outline: none;
+}
+
+select:focus, input:focus {
+  border-color: var(--accent);
+}
+
+/* 按钮 / Buttons */
+.btn {
+  background: #334155;
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 9px 12px;
+  font-size: 14px;
+  cursor: pointer;
+  transition: background 0.15s, transform 0.05s;
+}
+
+.btn:hover {
+  background: #475569;
+}
+
+.btn:active {
+  transform: translateY(1px);
+}
+
+.btn--primary {
+  background: var(--accent);
+  color: #0f172a;
+  font-weight: 600;
+  border-color: transparent;
+}
+
+.btn--primary:hover {
+  background: #7dd3fc;
+}
+
+.btn--danger {
+  background: transparent;
+  border-color: var(--danger);
+  color: var(--danger);
+}
+
+.btn--danger:hover {
+  background: rgba(239, 68, 68, 0.15);
+}
+
+.btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.btn-group {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+/* 图例 / Legend */
+.legend {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--text-dim);
+}
+
+.legend li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.swatch {
+  width: 18px;
+  height: 18px;
+  border-radius: 4px;
+  display: inline-block;
+  flex-shrink: 0;
+}
+
+.swatch--alloc { background: var(--alloc); }
+.swatch--free  { background: var(--free); }
+.swatch--hl    { background: var(--highlight); }
+
+/* 右侧可视化 + 日志 / Visual + Log */
+.visual {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-width: 0;
+}
+
+.visual__canvas {
+  flex: 1;
+  background: #0b1220;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  min-height: 320px;
+  overflow: auto;
+}
+
+#memory-svg {
+  width: 100%;
+  display: block;
+}
+
+/* 日志区 / Log */
+.log {
+  background: var(--panel-bg);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  height: 200px;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.log__header {
+  padding: 10px 16px;
+  font-size: 13px;
+  font-weight: 600;
+  border-bottom: 1px solid var(--border);
+  color: var(--accent);
+}
+
+#log-list {
+  list-style: none;
+  margin: 0;
+  padding: 8px 16px;
+  overflow-y: auto;
+  font-size: 13px;
+  line-height: 1.7;
+  font-family: "Consolas", "Courier New", monospace;
+}
+
+#log-list li {
+  color: var(--text-dim);
+}
+
+#log-list li .step-idx {
+  color: var(--accent);
+  margin-right: 8px;
+}
+
+/* SVG 内部元素样式 / SVG element styles */
+.mem-block {
+  transition: fill 0.25s ease, stroke 0.25s ease;
+  cursor: default;
+}
+
+.mem-block--free {
+  fill: var(--free);
+  fill-opacity: 0.35;
+}
+
+.mem-block--alloc {
+  fill: var(--alloc);
+  fill-opacity: 0.9;
+}
+
+.mem-block.highlight {
+  fill: var(--highlight);
+  stroke: #fff;
+  stroke-width: 2;
+}
+
+.mem-block.hit {
+  fill: var(--hit);
+}
+
+.mem-label {
+  font-size: 12px;
+  fill: var(--text-dim);
+}
+
+.mem-addr {
+  font-size: 11px;
+  fill: #cbd5e1;
+  font-family: "Consolas", "Courier New", monospace;
+}
+
+.mem-value {
+  font-size: 18px;
+  fill: #0f172a;
+  font-weight: 700;
+  font-family: "Consolas", "Courier New", monospace;
+}
+
+.mem-empty {
+  font-size: 12px;
+  fill: rgba(15, 23, 42, 0.5);
+}
+
+/* 值飞行动画的漂浮文本 */
+.mem-float {
+  font-size: 22px;
+  font-weight: 700;
+  font-family: "Consolas", "Courier New", monospace;
+  fill: #ffffff;
+  stroke: #0f172a;
+  stroke-width: 5px;
+  paint-order: stroke;
+  pointer-events: none;
+}
+
+/* 使用说明折叠块 / How to use */
+.panel__help {
+  background: #0f172a;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 10px 12px;
+}
+
+.panel__help summary {
+  cursor: pointer;
+  font-weight: 600;
+  font-size: 13px;
+  color: var(--accent);
+  list-style-position: inside;
+}
+
+.help-list {
+  margin: 8px 0 0;
+  padding-left: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--text-dim);
+}
+
+/* 中英双语切换 / Bilingual visibility */
+body.lang-zh .en { display: none; }
+body.lang-en .zh { display: none; }
