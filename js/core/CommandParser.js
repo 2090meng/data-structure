@@ -24,22 +24,28 @@ import { STEP, makeStep } from './Step.js';
 const IDENT = '[a-zA-Z_]\\w*';
 
 export class CommandParser {
+  /** 单次解析最多提取的指令条数（防御超大输入导致页面卡死）。 */
+  static MAX_COMMANDS = 100;
+
   /**
    * 解析整段代码。
    * @param {string} code
    * @returns {{
    *   commands: Array<{type:string,index:number|null,value:number,line:number}>,
    *   declaration: {capacity:number,values:number[],line:number}|null,
-   *   ignoredCount: number
+   *   ignoredCount: number,
+   *   truncated: boolean
    * }}
    */
   static parse(code) {
     const commands = [];
     let declaration = null;
     let ignoredCount = 0;
+    let truncated = false;
 
     const lines = String(code || '').split(/\r?\n/);
 
+    outer:
     for (let i = 0; i < lines.length; i++) {
       const lineNo = i + 1;
       let line = lines[i];
@@ -63,16 +69,21 @@ export class CommandParser {
               line: lineNo,
             };
           }
-          continue;
+        } else {
+          const cmd = CommandParser._parseStmt(stmt, lineNo);
+          if (cmd) commands.push(cmd);
+          else ignoredCount++; // 无法识别的内容：静默忽略
         }
 
-        const cmd = CommandParser._parseStmt(stmt, lineNo);
-        if (cmd) commands.push(cmd);
-        else ignoredCount++; // 无法识别的内容：静默忽略
+        // 到达上限后停止继续提取
+        if (commands.length + (declaration ? 1 : 0) >= CommandParser.MAX_COMMANDS) {
+          truncated = true;
+          break outer;
+        }
       }
     }
 
-    return { commands, declaration, ignoredCount };
+    return { commands, declaration, ignoredCount, truncated };
   }
 
   /** 解析初始化列表 "10, 20, 5" -> [10, 20, 5]。 */
@@ -157,7 +168,7 @@ export class CommandParser {
       switch (c.type) {
         case 'set': {
           if (c.index < 0 || c.index >= len) {
-            errors.push(CommandParser._err(c.line, `下标 ${c.index} 越界（当前长度 ${len}）`, `Index ${c.index} out of range (length ${len})`));
+            errors.push(CommandParser._err(c.line, `错误：数组下标 ${c.index} 越界（当前长度 ${len}）`, `Error: index ${c.index} out of range (length ${len})`));
           } else {
             s = array.planSet(c.index, c.value, len);
           }
@@ -166,15 +177,17 @@ export class CommandParser {
         case 'insert': {
           const idx = c.index === null ? len : c.index;
           if (idx < 0 || idx > len || len >= array.capacity) {
-            errors.push(CommandParser._err(c.line, `无法在下标 ${idx} 插入（下标越界或数组已满）`, `Cannot insert at index ${idx} (out of range or array full)`));
+            errors.push(CommandParser._err(c.line, `错误：数组下标 ${idx} 越界或数组已满`, `Error: index ${idx} out of range or array full`));
           } else {
             s = array.planInsert(idx, c.value, len, simMem);
           }
           break;
         }
         case 'remove': {
-          if (c.index < 0 || c.index >= len) {
-            errors.push(CommandParser._err(c.line, `下标 ${c.index} 越界（当前长度 ${len}）`, `Index ${c.index} out of range (length ${len})`));
+          if (len === 0) {
+            errors.push(CommandParser._err(c.line, `当前结构为空，无法操作`, `The structure is empty`));
+          } else if (c.index < 0 || c.index >= len) {
+            errors.push(CommandParser._err(c.line, `错误：数组下标 ${c.index} 越界（当前长度 ${len}）`, `Error: index ${c.index} out of range (length ${len})`));
           } else {
             s = array.planDelete(c.index, len, simMem);
           }
@@ -194,7 +207,7 @@ export class CommandParser {
         }
         case 'pop': {
           if (len <= 0) {
-            errors.push(CommandParser._err(c.line, `无法出栈/出队（当前为空）`, `Cannot pop (empty)`));
+            errors.push(CommandParser._err(c.line, `当前结构为空，无法操作`, `The structure is empty`));
           } else {
             s = array.planDelete(len - 1, len, simMem);
           }

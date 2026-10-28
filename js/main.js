@@ -10,6 +10,7 @@ import { Renderer } from './render/Renderer.js';
 import { Animator } from './animation/Animator.js';
 import { ArrayDS } from './structures/ArrayDS.js';
 import { CommandParser } from './core/CommandParser.js';
+import { Preprocessor } from './core/Preprocessor.js';
 
 // ---------- 1. 初始化语言 ----------
 i18n.setLang('zh');
@@ -31,6 +32,7 @@ const langSelect = document.getElementById('lang-select');
 const logList = document.getElementById('log-list');
 const codeInput = document.getElementById('code-input');
 const runCodeBtn = document.getElementById('run-code-btn');
+const extractBtn = document.getElementById('extract-btn');
 const codeView = document.getElementById('code-view');
 const speedSelect = document.getElementById('speed-select');
 
@@ -39,16 +41,24 @@ let memory = new MemoryModel();
 const renderer = new Renderer(svg);
 let array = new ArrayDS(memory, 8); // 默认数组，容量 8
 
-const animator = new Animator(memory, renderer, (text) => addLog(text), (line) => setActiveLine(line));
+const animator = new Animator(
+  memory,
+  renderer,
+  (text) => addLog(text),
+  (line) => setActiveLine(line),
+  (msg) => addLog({ zh: '执行出错：' + msg, en: 'Error: ' + msg }, true),
+  (busy) => setBusy(busy)
+);
 
 // 速度档位（毫秒）→ 与 HTML 中 speed-select 的 option value 对应
 const SPEED_MAP = { slow: 800, normal: 400, fast: 100, instant: 0 };
 
 // ---------- 4. 工具函数 ----------
-/** 向日志区追加一条步骤说明（自动按当前语言翻译）。 */
-function addLog(text) {
+/** 向日志区追加一条步骤说明（自动按当前语言翻译）。isError 为真时红色高亮。 */
+function addLog(text, isError = false) {
   if (!text) return;
   const li = document.createElement('li');
+  li.className = isError ? 'log-error' : '';
   const idx = document.createElement('span');
   idx.className = 'step-idx';
   idx.textContent = '[' + (logList.children.length + 1) + ']';
@@ -61,6 +71,21 @@ function addLog(text) {
 /** 清空日志。 */
 function clearLog() {
   logList.innerHTML = '';
+}
+
+/** 动画忙碌时锁定按钮，防止连点导致状态错乱。 */
+function setBusy(busy) {
+  executeBtn.disabled = !!busy;
+  runCodeBtn.disabled = !!busy;
+  resetBtn.disabled = !!busy;
+}
+
+/** 兜底错误处理：中断动画并输出红色错误日志。 */
+function handleError(e) {
+  animator.reset();
+  try { renderer.render(memory); } catch (_) {}
+  const msg = e && e.message ? e.message : String(e);
+  addLog({ zh: '执行出错：' + msg, en: 'Error: ' + msg }, true);
 }
 
 /** 根据当前选择的操作类型，显示/隐藏对应输入项。 */
@@ -87,6 +112,7 @@ function resetAll(capacity = 8) {
 
 // ---------- 6. 执行操作 ----------
 function execute() {
+  try {
   animator.reset(); // 清掉上一次未播完的步骤
 
   // 清除上一次查找留下的绿色命中标记
@@ -130,6 +156,9 @@ function execute() {
   animator.loadSteps(steps);
   renderer.render(memory);
   animator.playAll(); // 立即运行动画，让输入结果直接显示在内存块上
+  } catch (e) {
+    handleError(e);
+  }
 }
 
 // ---------- 6.5 代码驱动模式 ----------
@@ -168,9 +197,10 @@ function setActiveLine(line) {
 
 /** 解析并装载代码，生成动画步骤（每次从初始数组状态开始运行）。 */
 function runCode() {
+  try {
   syncCodeView();
 
-  const { commands, declaration, ignoredCount } = CommandParser.parse(codeInput.value);
+  const { commands, declaration, ignoredCount, truncated } = CommandParser.parse(codeInput.value);
 
   // 声明决定容量（默认 8，且不小于初始化元素个数）
   const capacity = declaration ? Math.max(declaration.capacity, declaration.values.length, 1) : 8;
@@ -179,9 +209,12 @@ function runCode() {
   if (ignoredCount > 0) {
     addLog({ zh: `已忽略 ${ignoredCount} 条无法识别的语句`, en: `Ignored ${ignoredCount} unrecognized statement(s)` });
   }
+  if (truncated) {
+    addLog({ zh: `指令过多，仅提取前 ${CommandParser.MAX_COMMANDS} 条`, en: `Too many commands, only the first ${CommandParser.MAX_COMMANDS} were used` }, true);
+  }
 
   const { steps, errors } = CommandParser.buildSteps(array, commands, declaration);
-  for (const e of errors) addLog(e.msg);
+  for (const e of errors) addLog(e.msg, true);
   if (!steps.length) {
     if (!errors.length) addLog({ zh: '没有可执行的指令', en: 'No executable commands' });
     animator.reset();
@@ -191,6 +224,30 @@ function runCode() {
 
   animator.loadSteps(steps);
   renderer.render(memory);
+  } catch (e) {
+    handleError(e);
+  }
+}
+
+/** 清洗并提取代码中的数据结构指令，替换回输入框并给出统计反馈。 */
+function extractCode() {
+  try {
+  const { output, count, ignoredCount, truncated } = Preprocessor.extract(codeInput.value);
+
+  if (count === 0) {
+    alert(i18n.t({ zh: '未检测到有效的数据结构指令，请检查语法', en: 'No valid data-structure instruction found, please check the syntax' }));
+    return;
+  }
+
+  codeInput.value = output;
+  syncCodeView();
+
+  const zhText = (truncated ? `指令过多，仅提取前 ${Preprocessor.MAX_EXTRACT} 条；` : '') + `已成功提取 ${count} 条有效指令，忽略 ${ignoredCount} 行无关代码`;
+  const enText = (truncated ? `Too many, only first ${Preprocessor.MAX_EXTRACT} extracted; ` : '') + `Extracted ${count} valid instruction(s), ignored ${ignoredCount} irrelevant line(s)`;
+  alert(i18n.t({ zh: zhText, en: enText }));
+  } catch (e) {
+    handleError(e);
+  }
 }
 
 // ---------- 7. 事件绑定 ----------
@@ -199,6 +256,7 @@ stepBtn.addEventListener('click', () => animator.stepOnce());
 playBtn.addEventListener('click', () => animator.playAll());
 resetBtn.addEventListener('click', resetAll);
 runCodeBtn.addEventListener('click', runCode);
+extractBtn.addEventListener('click', extractCode);
 codeInput.addEventListener('input', syncCodeView);
 opSelect.addEventListener('change', syncFields);
 langSelect.addEventListener('change', () => i18n.setLang(langSelect.value));

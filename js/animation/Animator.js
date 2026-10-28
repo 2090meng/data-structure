@@ -16,16 +16,22 @@ export class Animator {
    * @param {import('../render/Renderer.js').Renderer} renderer 渲染器
    * @param {(text:{zh:string,en:string}|null)=>void} onLog 日志回调（接收原始双语文本）
    * @param {(line:number|null)=>void} onLine 代码行回调（执行到带 line 的步骤时触发，用于高亮代码行）
+   * @param {(message:string)=>void} onError 执行出错时的回调（接收错误消息）
+   * @param {(busy:boolean)=>void} onBusyChange 忙碌状态变化回调（用于锁定/解锁按钮）
    */
-  constructor(memory, renderer, onLog = () => {}, onLine = () => {}) {
+  constructor(memory, renderer, onLog = () => {}, onLine = () => {}, onError = () => {}, onBusyChange = () => {}) {
     this.memory = memory;
     this.renderer = renderer;
     this.onLog = onLog;
     this.onLine = onLine;
+    this.onError = onError;
+    this.onBusyChange = onBusyChange;
     this.queue = [];          // 待执行步骤队列
     this.playing = false;     // 是否处于自动播放中
     this.generation = 0;      // 用于中断重置：reset 后递增，使进行中的异步执行作废
     this._currentLine = null; // 当前高亮的代码行号（1 起始）
+    this._busy = false;       // 是否正在执行动画（用于锁定按钮）
+    this._rollback = null;    // 装载步骤前的内存快照，动画出错时回滚
     this.speed = 400;         // 速度对应的毫秒延迟（0 = 瞬间），由 setSpeed 调整
   }
 
@@ -34,14 +40,36 @@ export class Animator {
     this.speed = Number(ms) || 0;
   }
 
+  /** 内部：切换“忙碌”状态并通知外部（仅状态变化时触发）。 */
+  _setBusy(busy) {
+    const b = !!busy;
+    if (b !== this._busy) {
+      this._busy = b;
+      this.onBusyChange(b);
+    }
+  }
+
+  /** 内部：回滚到装载步骤前的内存快照（用于动画出错时恢复）。 */
+  _recover() {
+    if (this._rollback) {
+      try {
+        this.memory.restore(this._rollback);
+        this.renderer.render(this.memory);
+      } catch (e) {
+        /* 回滚失败也不抛出，避免雪上加霜。 */
+      }
+    }
+  }
+
   /** 是否还有待执行步骤或正在自动播放。 */
   isBusy() {
     return this.playing || this.queue.length > 0;
   }
 
-  /** 装载一个操作的步骤序列（不立即执行）。 */
+  /** 装载一个操作的步骤序列（不立即执行）。同时保存当前内存快照，供出错时回滚。 */
   loadSteps(steps) {
     this.queue = steps.slice();
+    this._rollback = this.memory.snapshot();
     this.renderer.render(this.memory);
   }
 
@@ -54,21 +82,30 @@ export class Animator {
       this._currentLine = null;
       this.onLine(null);
     }
+    this._setBusy(false);
   }
 
-  /** 自动播放：顺序执行全部步骤。 */
+  /** 自动播放：顺序执行全部步骤。遇到异常时通过 onError 上报并停止。 */
   async playAll() {
     if (this.playing) return;
     this.playing = true;
+    this._setBusy(true);
     const gen = this.generation;
-    while (this.queue.length) {
-      if (gen !== this.generation) break; // 已被重置
-      const step = this.queue.shift();
-      await this._execute(step, gen);
-      if (gen !== this.generation) break;
-      await sleep(this.speed);
+    try {
+      while (this.queue.length) {
+        if (gen !== this.generation) break; // 已被重置
+        const step = this.queue.shift();
+        await this._execute(step, gen);
+        if (gen !== this.generation) break;
+        await sleep(this.speed);
+      }
+    } catch (e) {
+      this._recover();
+      this.onError(e && e.message ? e.message : String(e));
+    } finally {
+      this.playing = false;
+      this._setBusy(false);
     }
-    this.playing = false;
   }
 
   /** 单步执行：只执行队列中的下一步。返回是否真的执行了一步。 */
@@ -76,7 +113,15 @@ export class Animator {
     if (this.playing || this.queue.length === 0) return false;
     const gen = this.generation;
     const step = this.queue.shift();
-    await this._execute(step, gen);
+    this._setBusy(true);
+    try {
+      await this._execute(step, gen);
+    } catch (e) {
+      this._recover();
+      this.onError(e && e.message ? e.message : String(e));
+    } finally {
+      this._setBusy(false);
+    }
     return gen === this.generation;
   }
 

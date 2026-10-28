@@ -252,6 +252,15 @@ select:focus, input:focus, textarea:focus {
   margin-right: 8px;
 }
 
+#log-list li.log-error {
+  color: #e5484d;
+  font-weight: 600;
+}
+
+#log-list li.log-error .step-idx {
+  color: #e5484d;
+}
+
 /* SVG 内部元素样式 / SVG element styles */
 .mem-block {
   transition: fill 0.25s ease, stroke 0.25s ease;
