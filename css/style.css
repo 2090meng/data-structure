@@ -278,6 +278,38 @@ select:focus, input:focus, textarea:focus {
   fill-opacity: 0.9;
 }
 
+/* 链表中被删除（已摘链、内存未回收）的结点 */
+.mem-block--freed {
+  fill: var(--free);
+  fill-opacity: 0.25;
+  stroke: #64748b;
+  stroke-dasharray: 4 3;
+}
+
+/* 链表结点内 data | next 的分隔线 */
+.mem-divider {
+  stroke: rgba(15, 23, 42, 0.35);
+  stroke-width: 1;
+}
+
+/* 链表结点 next 栏的后继地址 */
+.mem-next {
+  font-size: 10px;
+  fill: rgba(15, 23, 42, 0.78);
+  font-family: "Consolas", "Courier New", monospace;
+}
+
+.mem-next--freed {
+  fill: rgba(15, 23, 42, 0.4);
+}
+
+/* 链表 next 指针箭头 */
+.mem-link {
+  stroke: var(--accent);
+  stroke-width: 2;
+  fill: none;
+}
+
 .mem-block.highlight {
   fill: var(--highlight);
   stroke: #fff;

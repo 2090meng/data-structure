@@ -4,7 +4,7 @@
  * 职责：绑定界面事件，把用户输入转成操作指令，
  * 串联「数据结构层 → 动画层 → 渲染层」三部分，并维护日志与语言状态。
  *
- * 当前支持三种结构：数组 Array / 栈 Stack / 队列 Queue。
+ * 当前支持四种结构：数组 Array / 链表 Linked List / 栈 Stack / 队列 Queue。
  * 切换结构会重建内存与结构对象，操作项（下拉框）随之动态变化。
  */
 import { i18n } from './i18n.js';
@@ -12,6 +12,7 @@ import { MemoryModel } from './core/MemoryModel.js';
 import { Renderer } from './render/Renderer.js';
 import { Animator } from './animation/Animator.js';
 import { ArrayDS } from './structures/ArrayDS.js';
+import { LinkedListDS } from './structures/LinkedListDS.js';
 import { StackDS } from './structures/StackDS.js';
 import { QueueDS } from './structures/QueueDS.js';
 import { CommandParser } from './core/CommandParser.js';
@@ -61,7 +62,7 @@ const animator = new Animator(
 const SPEED_MAP = { slow: 800, normal: 400, fast: 100, instant: 0 };
 
 // 各结构的默认容量
-const DEFAULT_CAPACITY = { array: 8, stack: 8, queue: 6 };
+const DEFAULT_CAPACITY = { array: 8, linked: 8, stack: 8, queue: 6 };
 
 // 各结构支持的操作项（value -> 中英标签）
 const OPS = {
@@ -69,6 +70,11 @@ const OPS = {
     ['insert', '插入 Insert'],
     ['delete', '删除 Delete'],
     ['set', '修改/赋值 Set'],
+    ['search', '查找 Search'],
+  ],
+  linked: [
+    ['insert', '插入 Insert'],
+    ['delete', '删除 Delete'],
     ['search', '查找 Search'],
   ],
   stack: [
@@ -115,6 +121,20 @@ int main() {
     }
     printf("\\n");
 
+    return 0;
+}`,
+  linked: `#include <stdio.h>
+
+int main() {
+    // 单链表：带头结点，每个结点单独 malloc，地址不连续
+    int L[8] = {10, 20, 30};   // 尾插法依次建立 10 -> 20 -> 30
+
+    insert(L, 1, 5);    // 头插：p = 头结点; s->next = p->next; p->next = s;
+    insert(L, 3, 99);   // 在第 3 个位置前插入 99
+    remove(L, 2);       // 删除第 2 个结点：p->next = q->next; free(q);
+    search(L, 30);      // p = p->next 逐个比较
+
+    printf("演示结束（打印语句会被忽略）\\n");
     return 0;
 }`,
   stack: `#include <stdio.h>
@@ -203,6 +223,7 @@ function parseIntValue(input) {
 
 // ---------- 5. 结构构建 / 重置 ----------
 function createStructure(kind, mem, capacity) {
+  if (kind === 'linked') return new LinkedListDS(mem, capacity);
   if (kind === 'stack') return new StackDS(mem, capacity);
   if (kind === 'queue') return new QueueDS(mem, capacity);
   return new ArrayDS(mem, capacity);
@@ -284,6 +305,23 @@ function execute() {
     } else if (op === 'search') {
       if (value === null) return addLog({ zh: '请输入合法的查找值', en: 'Invalid value' });
       if (structure.length === 0) return addLog({ zh: '数组为空，无法查找', en: 'The array is empty' });
+      steps = structure.planSearch(value);
+    }
+  } else if (structKind === 'linked') {
+    if (op === 'insert') {
+      if (index === null || value === null) return addLog({ zh: '请输入合法的位序和值', en: 'Invalid position or value' });
+      const err = structure.insertError(index);
+      if (err) return addLog(err, true);
+      steps = structure.planInsert(index, value);
+    } else if (op === 'delete') {
+      if (index === null) return addLog({ zh: '请输入合法的位序', en: 'Invalid position' });
+      const err = structure.deleteError(index);
+      if (err) return addLog(err, true);
+      steps = structure.planDelete(index);
+    } else if (op === 'search') {
+      if (value === null) return addLog({ zh: '请输入合法的查找值', en: 'Invalid value' });
+      const err = structure.searchError();
+      if (err) return addLog(err, true);
       steps = structure.planSearch(value);
     }
   } else if (structKind === 'stack') {
@@ -387,7 +425,8 @@ function runCode() {
   resetAll(capacity);
   // 代码模式从“声明初始化”开始：让结构内部元素个数与初始化真实写入的数量一致，
   // 后续插入/删除/入栈出队的 length++/-- 才能累积出正确结果。
-  if (declaration) structure.setInitialLength(declaration.values.length);
+  // 链表没有预分配槽位，初始化值会在 buildSteps 里按尾插法逐个建立结点，这里不处理。
+  if (declaration && structKind !== 'linked') structure.setInitialLength(declaration.values.length);
 
   // 循环队列牺牲一个单元，初始化值超过 MaxSize-1 时多余部分会被忽略，这里明确提示。
   if (declaration && structKind === 'queue' && declaration.values.length > structure.maxSize) {

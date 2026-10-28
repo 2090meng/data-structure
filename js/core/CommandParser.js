@@ -17,8 +17,9 @@
  *   enqueue(q, 10);              队列入队
  *   dequeue(q);                  队列出队
  *
- * 指令的语义会随当前数据结构（数组 / 栈 / 队列）自动映射：
+ * 指令的语义会随当前数据结构（数组 / 链表 / 栈 / 队列）自动映射：
  *   数组：push/pop 等价于“末尾追加 / 删除末尾”；下标相关的指令全部支持。
+ *   链表：insert / remove 按位序（1 起始，第 1 个结点在头结点之后），push/pop 等价于表尾操作。
  *   栈：只支持栈顶操作（push / pop / search），按下标插入删除会报错。
  *   队列：只支持队头出队、队尾入队（enqueue / dequeue / search）。
  *
@@ -201,7 +202,10 @@ export class CommandParser {
     const sim = new Map();
     const simMem = { read: (id) => (sim.has(id) ? sim.get(id) : null) };
     const kind = structure.kind || 'array';
-    let len = 0;
+    // 链表的“规划期链”：结点 id 的顺序由 plan* 就地推进，供后续指令继续规划。
+    // （链表没有 slots，规划起点直接取当前真实链长；其余结构由调用方先重置为空结构。）
+    const ctx = kind === 'linked' ? structure.planningContext() : null;
+    let len = ctx ? ctx.chain.length : 0;
     // 队列的“规划期队头”：代码模式一次性规划多行，真实 front 要等动画执行到
     // META 步骤才会变，因此必须自己推进，否则出队后的下次入队会覆盖旧槽位。
     let front = kind === 'queue' ? structure.front % structure.capacity : 0;
@@ -209,20 +213,32 @@ export class CommandParser {
     // 1) 声明初始化：把 { ... } 里的值依次写入槽位（超出容量的部分忽略）。
     //    循环队列牺牲一个单元，可存元素最多 MaxSize-1 个，初始化也要按这个上限截断。
     if (declaration) {
-      const limit = kind === 'queue'
-        ? Math.min(structure.slots.length, structure.maxSize)
-        : structure.slots.length;
-      declaration.values.forEach((v, i) => {
-        if (i >= limit) return;
-        const st = makeStep(STEP.SET_VALUE, { block: structure.slots[i].id, value: v }, {
-          zh: `初始化 [${i}] = ${v}`,
-          en: `Initialize [${i}] = ${v}`,
+      if (kind === 'linked') {
+        // 链表没有预分配的连续槽位：初始化值按【尾插法】逐个建立结点。
+        for (const v of declaration.values) {
+          if (ctx.chain.length >= structure.maxNodes) break;
+          const s = structure.planInsert(ctx.chain.length + 1, v, ctx.chain.length, simMem, ctx);
+          for (const st of s) st.line = declaration.line;
+          steps.push(...s);
+          CommandParser._simulate(sim, s);
+        }
+        len = ctx.chain.length;
+      } else {
+        const limit = kind === 'queue'
+          ? Math.min(structure.slots.length, structure.maxSize)
+          : structure.slots.length;
+        declaration.values.forEach((v, i) => {
+          if (i >= limit) return;
+          const st = makeStep(STEP.SET_VALUE, { block: structure.slots[i].id, value: v }, {
+            zh: `初始化 [${i}] = ${v}`,
+            en: `Initialize [${i}] = ${v}`,
+          });
+          st.line = declaration.line;
+          steps.push(st);
+          sim.set(structure.slots[i].id, v);
         });
-        st.line = declaration.line;
-        steps.push(st);
-        sim.set(structure.slots[i].id, v);
-      });
-      len = Math.min(declaration.values.length, limit);
+        len = Math.min(declaration.values.length, limit);
+      }
     }
 
     // 2) 逐条指令展开。
@@ -253,6 +269,10 @@ export class CommandParser {
             }
           } else if (kind === 'queue') {
             errors.push(CommandParser._kindErr(c.line, kind));
+          } else if (kind === 'linked') {
+            const err = structure.insertError(pos, len);
+            if (err) errors.push(CommandParser._errMsg(c.line, err));
+            else s = structure.planInsert(pos, c.value, len, simMem, ctx);
           } else if (pos < 1 || pos > len + 1 || len >= structure.capacity) {
             errors.push(CommandParser._err(c.line, `错误：插入位序 ${pos} 越界（应为 1..${len + 1}）或数组已满`, `Error: position ${pos} out of range (1..${len + 1}) or array full`));
           } else {
@@ -275,6 +295,10 @@ export class CommandParser {
             } else {
               s = structure.planDequeue(len, simMem, front);
             }
+          } else if (kind === 'linked') {
+            const err = structure.deleteError(c.index, len);
+            if (err) errors.push(CommandParser._errMsg(c.line, err));
+            else s = structure.planDelete(c.index, len, simMem, ctx);
           } else if (c.index < 1 || c.index > len) {
             errors.push(CommandParser._err(c.line, `错误：删除位序 ${c.index} 越界（应为 1..${len}）`, `Error: position ${c.index} out of range (1..${len})`));
           } else {
@@ -298,7 +322,13 @@ export class CommandParser {
           break;
         }
         case 'search': {
-          s = structure.planSearch(c.value, len, simMem, front);
+          if (kind === 'linked') {
+            const err = structure.searchError(len);
+            if (err) errors.push(CommandParser._errMsg(c.line, err));
+            else s = structure.planSearch(c.value, len, simMem, ctx);
+          } else {
+            s = structure.planSearch(c.value, len, simMem, front);
+          }
           break;
         }
         case 'push': {
@@ -306,6 +336,10 @@ export class CommandParser {
             const err = structure.enqueueError(len, front, simMem);
             if (err) errors.push(CommandParser._errMsg(c.line, err));
             else s = structure.planEnqueue(c.value, len, simMem, front);
+          } else if (kind === 'linked') {
+            const err = structure.insertError(len + 1, len);
+            if (err) errors.push(CommandParser._errMsg(c.line, err));
+            else s = structure.planInsert(len + 1, c.value, len, simMem, ctx); // 表尾追加
           } else if (len >= structure.capacity) {
             errors.push(CommandParser._err(c.line, `无法入栈/入队（已满 ${len}/${structure.capacity}）`, `Cannot push (structure full, ${len}/${structure.capacity})`));
           } else if (kind === 'stack') {
@@ -322,6 +356,10 @@ export class CommandParser {
             s = structure.planPop(len, simMem);
           } else if (kind === 'queue') {
             s = structure.planDequeue(len, simMem, front);
+          } else if (kind === 'linked') {
+            const err = structure.deleteError(len, len);
+            if (err) errors.push(CommandParser._errMsg(c.line, err));
+            else s = structure.planDelete(len, len, simMem, ctx); // 删除表尾
           } else {
             s = structure.planDelete(len, len, simMem); // 删除第 len 个 = 表尾
           }
@@ -359,7 +397,7 @@ export class CommandParser {
 
       // 向前推进“模拟状态”，供下一行规划使用。
       CommandParser._simulate(sim, s);
-      len = CommandParser._nextLen(c.type, len);
+      len = kind === 'linked' ? ctx.chain.length : CommandParser._nextLen(c.type, len);
 
       // 队列出队（dequeue / pop / remove(0)）后队头也要跟着推进，保持规划期状态一致。
       const dequeued =
@@ -410,6 +448,13 @@ export class CommandParser {
         line,
         '错误：栈只能操作栈顶，请使用 push / pop / search',
         'Error: a stack only supports push / pop / search'
+      );
+    }
+    if (kind === 'linked') {
+      return CommandParser._err(
+        line,
+        '错误：链表请使用 insert / remove / search（push / pop 等价于表尾插入 / 删除）',
+        'Error: use insert / remove / search on a linked list (push / pop mean append / delete at the tail)'
       );
     }
     return CommandParser._err(
