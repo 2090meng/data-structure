@@ -27,6 +27,10 @@ const INSERT_PATTERN = /for\s*\([^)]*\)\s*\{[\s\S]*?arr\[i\]\s*=\s*arr\[i\s*-\s*
 // 映射为 remove(arr, k)，触发元素前移动画。
 const DELETE_PATTERN = /for\s*\([^)]*?\bi\s*=\s*(\d+)[^)]*\)\s*\{[\s\S]*?arr\[i\]\s*=\s*arr\[i\s*\+\s*1\];[\s\S]*?\}/g;
 
+// C 风格“临时变量交换”：t = arr[a]; arr[a] = arr[b]; arr[b] = t;
+// 映射为 swap(a, b)，触发两个内存块的交换动画。仅识别最标准的写法。
+const SWAP_PATTERN = /(?:int\s+)?(\w+)\s*=\s*arr\[(\d+)\]\s*;[\s\S]*?arr\[(\d+)\]\s*=\s*arr\[(\d+)\]\s*;[\s\S]*?arr\[(\d+)\]\s*=\s*\1\s*;/g;
+
 export class Preprocessor {
   /** 单次提取最多保留的指令条数（防御超大输入导致页面卡死）。 */
   static MAX_EXTRACT = 100;
@@ -45,6 +49,10 @@ export class Preprocessor {
     // 先做 C 风格“数组移位”模式识别：把 for 循环实现的后移插入 / 前移删除
     // 转换成 insert / remove 指令，随后由下面的白名单统一提取。
     let text = String(code || '');
+    // 先识别“临时变量交换”，避免被后续逐行规则把三行交换拆散。
+    text = text.replace(SWAP_PATTERN, (m, tmp, i1, i2, j1, i3) =>
+      i1 === i2 && i3 === j1 && i1 !== j1 ? `swap(${i1}, ${j1});` : m
+    );
     text = text.replace(INSERT_PATTERN, (m, k, v) => `insert(arr, ${k}, ${v});`);
     text = text.replace(DELETE_PATTERN, (m, k) => `remove(arr, ${k});`);
 
@@ -146,6 +154,55 @@ Preprocessor._PATTERNS = [
     exact: true,
     re: new RegExp('^(' + IDENT + ')\\s*\\[\\s*(-?\\d+)\\s*\\]\\s*=\\s*(-?\\d+)$', 'i'),
     fmt: (m) => `arr[${m[2]}] = ${m[3]};`,
+  },
+  // ---- 简写模式：省略变量名 ----
+  // set(i, v) -> arr[i] = v;
+  {
+    exact: true,
+    re: /^set\s*\(\s*(-?\d+)\s*,\s*(-?\d+)\s*\)$/i,
+    fmt: (m) => `arr[${m[1]}] = ${m[2]};`,
+  },
+  // swap(i, j)
+  {
+    exact: true,
+    re: /^swap\s*\(\s*(-?\d+)\s*,\s*(-?\d+)\s*\)$/i,
+    fmt: (m) => `swap(${m[1]}, ${m[2]});`,
+  },
+  // insert(i, v)
+  {
+    exact: true,
+    re: /^insert\s*\(\s*(-?\d+)\s*,\s*(-?\d+)\s*\)$/i,
+    fmt: (m) => `insert(arr, ${m[1]}, ${m[2]});`,
+  },
+  // insert(v)
+  {
+    exact: true,
+    re: /^insert\s*\(\s*(-?\d+)\s*\)$/i,
+    fmt: (m) => `insert(arr, ${m[1]});`,
+  },
+  // remove(i) / delete(i)
+  {
+    exact: true,
+    re: /^(?:remove|delete)\s*\(\s*(-?\d+)\s*\)$/i,
+    fmt: (m) => `remove(arr, ${m[1]});`,
+  },
+  // search(v)
+  {
+    exact: true,
+    re: /^search\s*\(\s*(-?\d+)\s*\)$/i,
+    fmt: (m) => `search(arr, ${m[1]});`,
+  },
+  // push(v)
+  {
+    exact: true,
+    re: /^push\s*\(\s*(-?\d+)\s*\)$/i,
+    fmt: (m) => `push(arr, ${m[1]});`,
+  },
+  // pop()
+  {
+    exact: true,
+    re: /^pop\s*\(\s*\)$/i,
+    fmt: () => `pop(arr);`,
   },
   // 链表节点创建：malloc 或 new 关键字 -> create_node()
   {

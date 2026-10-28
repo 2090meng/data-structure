@@ -18,6 +18,7 @@ export const STEP = {
   HIGHLIGHT: 'highlight',        // 高亮一个块
   UNHIGHLIGHT: 'unhighlight',    // 取消高亮一个块
   MOVE_VALUE: 'move_value',      // 值从 payload.from 移动到 payload.to
+  SWAP: 'swap',                  // 交换 payload.a 与 payload.b 两个块的值
   SET_VALUE: 'set_value',        // 向 payload.block 写入 payload.value
   CLEAR_VALUE: 'clear_value',    // 清空 payload.block 的值
   COMPARE: 'compare',            // 查找比较：高亮 payload.block 与 payload.value 对比

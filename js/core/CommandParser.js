@@ -124,6 +124,39 @@ export class CommandParser {
     m = stmt.match(new RegExp('^pop\\s*\\(\\s*' + IDENT + '\\s*\\)$', 'i'));
     if (m) return { type: 'pop', index: null, value: null, line };
 
+    // ---------- 简写模式：省略变量名，直接写数字参数 ----------
+    // set(i, v)
+    m = stmt.match(/^set\s*\(\s*(-?\d+)\s*,\s*(-?\d+)\s*\)$/i);
+    if (m) return { type: 'set', index: +m[1], value: +m[2], line };
+
+    // swap(i, j) —— 交换两个下标的值
+    m = stmt.match(/^swap\s*\(\s*(-?\d+)\s*,\s*(-?\d+)\s*\)$/i);
+    if (m) return { type: 'swap', index: +m[1], index2: +m[2], value: null, line };
+
+    // insert(i, v)
+    m = stmt.match(/^insert\s*\(\s*(-?\d+)\s*,\s*(-?\d+)\s*\)$/i);
+    if (m) return { type: 'insert', index: +m[1], value: +m[2], line };
+
+    // insert(v) —— 末尾追加
+    m = stmt.match(/^insert\s*\(\s*(-?\d+)\s*\)$/i);
+    if (m) return { type: 'insert', index: null, value: +m[1], line };
+
+    // remove(i) / delete(i)
+    m = stmt.match(/^(?:remove|delete)\s*\(\s*(-?\d+)\s*\)$/i);
+    if (m) return { type: 'remove', index: +m[1], line };
+
+    // search(v)
+    m = stmt.match(/^search\s*\(\s*(-?\d+)\s*\)$/i);
+    if (m) return { type: 'search', index: null, value: +m[1], line };
+
+    // push(v)
+    m = stmt.match(/^push\s*\(\s*(-?\d+)\s*\)$/i);
+    if (m) return { type: 'push', index: null, value: +m[1], line };
+
+    // pop()
+    m = stmt.match(/^pop\s*\(\s*\)$/i);
+    if (m) return { type: 'pop', index: null, value: null, line };
+
     return null;
   }
 
@@ -193,6 +226,16 @@ export class CommandParser {
           }
           break;
         }
+        case 'swap': {
+          const ia = c.index;
+          const ib = c.index2;
+          if (ia < 0 || ia >= len || ib < 0 || ib >= len) {
+            errors.push(CommandParser._err(c.line, `错误：数组下标越界（当前长度 ${len}）`, `Error: index out of range (length ${len})`));
+          } else if (ia !== ib) {
+            s = array.planSwap(ia, ib, len);
+          }
+          break;
+        }
         case 'search': {
           s = array.planSearch(c.value, len, simMem);
           break;
@@ -245,6 +288,12 @@ export class CommandParser {
         else sim.delete(st.payload.to);
       } else if (st.type === STEP.CLEAR_VALUE) {
         sim.delete(st.payload.block);
+      } else if (st.type === STEP.SWAP) {
+        const { a, b } = st.payload;
+        const va = sim.has(a) ? sim.get(a) : null;
+        const vb = sim.has(b) ? sim.get(b) : null;
+        if (vb !== null) sim.set(a, vb); else sim.delete(a);
+        if (va !== null) sim.set(b, va); else sim.delete(b);
       }
     }
   }

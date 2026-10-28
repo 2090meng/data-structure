@@ -47,6 +47,21 @@ export class ArrayDS {
     return steps;
   }
 
+  /** 规划：交换 indexA 与 indexB 两个位置的值（长度不变）。 */
+  planSwap(indexA, indexB, len = this.length) {
+    const steps = [];
+    if (indexA === indexB || indexA < 0 || indexA >= len || indexB < 0 || indexB >= len) {
+      return steps;
+    }
+    steps.push(
+      makeStep(STEP.SWAP, { a: this.slots[indexA].id, b: this.slots[indexB].id }, {
+        zh: `交换下标 ${indexA} 与下标 ${indexB} 的元素`,
+        en: `Swap elements at index ${indexA} and index ${indexB}`,
+      })
+    );
+    return steps;
+  }
+
   /** 规划：在 index 位置插入 value。 */
   planInsert(index, value, len = this.length, mem = this.memory) {
     const steps = [];

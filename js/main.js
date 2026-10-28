@@ -257,7 +257,7 @@ function extractCode() {
 executeBtn.addEventListener('click', execute);
 stepBtn.addEventListener('click', () => animator.stepOnce());
 playBtn.addEventListener('click', () => animator.playAll());
-resetBtn.addEventListener('click', resetAll);
+resetBtn.addEventListener('click', () => resetAll());
 runCodeBtn.addEventListener('click', runCode);
 extractBtn.addEventListener('click', extractCode);
 codeInput.addEventListener('input', syncCodeView);

@@ -164,6 +164,29 @@ export class Animator {
         break;
       }
 
+      // 交换两个块的值：同时高亮两块 -> 交换 -> 停留 -> 取消高亮。
+      case STEP.SWAP: {
+        const { a, b } = step.payload;
+        const ba = this.memory.getBlock(a);
+        const bb = this.memory.getBlock(b);
+        if (ba) ba.highlight = true;
+        if (bb) bb.highlight = true;
+        this.renderer.render(this.memory);
+        await sleep(this.speed);
+        if (gen !== this.generation) return;
+        const va = this.memory.read(a);
+        const vb = this.memory.read(b);
+        this.memory.write(a, vb);
+        this.memory.write(b, va);
+        this.renderer.render(this.memory);
+        await sleep(this.speed);
+        if (gen !== this.generation) return;
+        if (ba) ba.highlight = false;
+        if (bb) bb.highlight = false;
+        this.renderer.render(this.memory);
+        break;
+      }
+
       // 写入值：高亮目标块 -> 写入 -> 短暂停留 -> 取消高亮。
       case STEP.SET_VALUE: {
         const { block, value } = step.payload;
