@@ -32,6 +32,7 @@ export class Animator {
     this._currentLine = null; // 当前高亮的代码行号（1 起始）
     this._busy = false;       // 是否正在执行动画（用于锁定按钮）
     this._rollback = null;    // 装载步骤前的内存快照，动画出错时回滚
+    this.history = [];        // 已执行步骤的历史（含执行前快照），用于“上一步”回退
     this.speed = 400;         // 速度对应的毫秒延迟（0 = 瞬间），由 setSpeed 调整
   }
 
@@ -69,6 +70,7 @@ export class Animator {
   /** 装载一个操作的步骤序列（不立即执行）。同时保存当前内存快照，供出错时回滚。 */
   loadSteps(steps) {
     this.queue = steps.slice();
+    this.history = [];
     this._rollback = this.memory.snapshot();
     this.renderer.render(this.memory);
   }
@@ -77,7 +79,9 @@ export class Animator {
   reset() {
     this.playing = false;
     this.queue = [];
+    this.history = [];
     this.generation++;
+    this._rollback = null; // 清掉旧快照，避免 resetAll 后回滚到已废弃的内存
     if (this._currentLine !== null) {
       this._currentLine = null;
       this.onLine(null);
@@ -95,8 +99,10 @@ export class Animator {
       while (this.queue.length) {
         if (gen !== this.generation) break; // 已被重置
         const step = this.queue.shift();
+        const snap = this.memory.snapshot();
         await this._execute(step, gen);
         if (gen !== this.generation) break;
+        this.history.push({ step, memory: snap });
         await sleep(this.speed);
       }
     } catch (e) {
@@ -113,9 +119,11 @@ export class Animator {
     if (this.playing || this.queue.length === 0) return false;
     const gen = this.generation;
     const step = this.queue.shift();
+    const snap = this.memory.snapshot();
     this._setBusy(true);
     try {
       await this._execute(step, gen);
+      if (gen === this.generation) this.history.push({ step, memory: snap });
     } catch (e) {
       this._recover();
       this.onError(e && e.message ? e.message : String(e));
@@ -123,6 +131,27 @@ export class Animator {
       this._setBusy(false);
     }
     return gen === this.generation;
+  }
+
+  /** 回退一步：恢复到该步骤执行前的内存状态，并把它放回队列。 */
+  stepBack() {
+    if (this.playing || this._busy || this.history.length === 0) return false;
+    const rec = this.history.pop();
+    try {
+      this.memory.restore(rec.memory);
+      // META 改的是结构自身状态（如数组 length），内存快照不包含，需反向执行还原。
+      if (rec.step.type === STEP.META && typeof rec.step.payload.undo === 'function') {
+        rec.step.payload.undo();
+      }
+      this.queue.unshift(rec.step);
+      this.renderer.render(this.memory);
+      // 代码行高亮回到被撤销步骤对应的行；无行号则清除。
+      this._currentLine = typeof rec.step.line === 'number' ? rec.step.line : null;
+      this.onLine(this._currentLine);
+    } catch (e) {
+      this.onError(e && e.message ? e.message : String(e));
+    }
+    return true;
   }
 
   /** 执行单个步骤（含动画与日志）。 */

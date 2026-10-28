@@ -26,6 +26,7 @@ const indexField = document.getElementById('index-field');
 const valueField = document.getElementById('value-field');
 const executeBtn = document.getElementById('execute-btn');
 const stepBtn = document.getElementById('step-btn');
+const stepBackBtn = document.getElementById('step-back-btn');
 const playBtn = document.getElementById('play-btn');
 const resetBtn = document.getElementById('reset-btn');
 const langSelect = document.getElementById('lang-select');
@@ -78,6 +79,7 @@ function setBusy(busy) {
   executeBtn.disabled = !!busy;
   runCodeBtn.disabled = !!busy;
   resetBtn.disabled = !!busy;
+  stepBackBtn.disabled = !!busy;
 }
 
 /** 兜底错误处理：中断动画并输出红色错误日志。 */
@@ -94,10 +96,13 @@ function syncFields() {
   indexField.style.display = op === 'search' ? 'none' : 'flex';
 }
 
-/** 解析整数输入。 */
+/** 解析整数输入（仅接受整数；空、非数字、小数一律返回 null）。 */
 function parseIntValue(input) {
-  const n = Number(input.value);
-  return Number.isFinite(n) && input.value.trim() !== '' ? n : null;
+  const raw = input.value.trim();
+  if (raw === '') return null;
+  const n = Number(raw);
+  if (!Number.isFinite(n) || !Number.isInteger(n)) return null;
+  return n;
 }
 
 // ---------- 5. 重置 ----------
@@ -208,6 +213,9 @@ function runCode() {
   // 声明决定容量（默认 8，且不小于初始化元素个数）
   const capacity = declaration ? Math.max(declaration.capacity, declaration.values.length, 1) : 8;
   resetAll(capacity);
+  // 代码模式从“声明初始化”开始：让数组内部长度与初始化真实写入的元素一致，
+  // 后续插入/删除的 length++/-- 才能累积出正确结果，避免切回手动模式时长度错乱。
+  if (declaration) array.length = declaration.values.length;
 
   if (cleaned.ignoredCount > 0) {
     addLog({ zh: `已忽略 ${cleaned.ignoredCount} 条无关语句`, en: `Ignored ${cleaned.ignoredCount} irrelevant statement(s)` });
@@ -255,6 +263,7 @@ function extractCode() {
 
 // ---------- 7. 事件绑定 ----------
 executeBtn.addEventListener('click', execute);
+stepBackBtn.addEventListener('click', () => animator.stepBack());
 stepBtn.addEventListener('click', () => animator.stepOnce());
 playBtn.addEventListener('click', () => animator.playAll());
 resetBtn.addEventListener('click', () => resetAll());

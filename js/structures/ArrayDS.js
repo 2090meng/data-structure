@@ -91,7 +91,7 @@ export class ArrayDS {
     );
 
     // 元数据更新：元素个数 +1（动画执行到此处才生效）
-    steps.push(makeStep(STEP.META, { run: () => { this.length++; } }));
+    steps.push(makeStep(STEP.META, { run: () => { this.length++; }, undo: () => { this.length--; } }));
 
     return steps;
   }
@@ -123,7 +123,7 @@ export class ArrayDS {
     );
 
     // 元数据更新：元素个数 -1
-    steps.push(makeStep(STEP.META, { run: () => { this.length--; } }));
+    steps.push(makeStep(STEP.META, { run: () => { this.length--; }, undo: () => { this.length++; } }));
 
     return steps;
   }

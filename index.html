@@ -38,6 +38,7 @@
           <li><span class="zh">填参数：插入/删除/修改填「下标」，插入/修改/查找填「值」。</span><span class="en">Fill parameters: index for insert/delete/set, value for insert/set/search.</span></li>
           <li><span class="zh">点「执行」立即运行动画查看结果；代码模式点「运行代码」后，用「单步执行」逐行或「自动播放」连续播放。</span><span class="en">Click "Execute" to run the animation right away; in code mode, click "Run Code" then "Step" line by line or "Play" to auto-run.</span></li>
           <li><span class="zh">也可在「代码驱动」区输入伪代码，点「运行代码」后逐行高亮执行，右侧内存同步变化。</span><span class="en">Or type pseudo-code in the code area and click "Run Code" — it highlights each line while the memory updates.</span></li>
+          <li><span class="zh">若粘贴的是完整 C 代码，先点「提取指令」：它会自动过滤 #include、printf、for/while/if 等无关代码，只保留初始化、赋值、插入、删除、交换、查找等可演示操作，并把清洗后的指令回填到输入框；再点「运行代码」即可演示。</span><span class="en">If you paste full C code, click "Extract" first: it strips #include, printf, for/while/if and other irrelevant code, keeps only demonstrable operations (init, assignment, insert, remove, swap, search), and writes the cleaned commands back into the box; then click "Run Code" to play.</span></li>
           <li><span class="zh">观察右侧内存块的地址与值变化，配合下方日志理解每一步。</span><span class="en">Watch the memory block addresses/values on the right, with the log below.</span></li>
           <li><span class="zh">点「重置」清空并恢复初始状态。</span><span class="en">Click "Reset" to clear and restart.</span></li>
         </ol>
@@ -97,14 +98,16 @@
           <code>int arr[10] = {10, 20, 5};</code> 声明并初始化；
           <code>arr[1] = 20;</code> 修改；<code>insert(arr, 2, 5);</code> 插入；
           <code>push(arr, 7);</code> 入栈/队；<code>pop(arr);</code> 出栈/队；
-          <code>remove(arr, 0);</code> 删除；<code>search(arr, 5);</code> 查找。
+          <code>remove(arr, 0);</code> 删除；<code>search(arr, 5);</code> 查找；
+          简写可省略变量名：<code>set(2, 99);</code>、<code>insert(2, 99);</code>、<code>remove(1);</code>、<code>swap(1, 3);</code>。
         </div>
         <div class="code-hint en">
           C/C++-style (case-insensitive, <code>//</code> comments, <code>;</code> separator; <code>#include</code>, <code>printf</code>, <code>for</code> etc. are ignored):
           <code>int arr[10] = {10, 20, 5};</code> declare &amp; initialize;
           <code>arr[1] = 20;</code> set; <code>insert(arr, 2, 5);</code> insert;
           <code>push(arr, 7);</code> push; <code>pop(arr);</code> pop;
-          <code>remove(arr, 0);</code> delete; <code>search(arr, 5);</code> search.
+          <code>remove(arr, 0);</code> delete; <code>search(arr, 5);</code> search;
+          shorthand (variable omitted): <code>set(2, 99);</code>, <code>insert(2, 99);</code>, <code>remove(1);</code>, <code>swap(1, 3);</code>.
         </div>
         <div class="btn-group">
           <button id="run-code-btn" class="btn btn--primary">
@@ -120,6 +123,9 @@
         <h2 class="panel__title zh">4. 播放控制</h2>
         <h2 class="panel__title en">4. Playback</h2>
         <div class="btn-group">
+          <button id="step-back-btn" class="btn">
+            <span class="zh">上一步</span><span class="en">Step Back</span>
+          </button>
           <button id="step-btn" class="btn">
             <span class="zh">单步执行</span><span class="en">Step</span>
           </button>
