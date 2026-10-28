@@ -1,30 +1,43 @@
 /**
- * CommandParser.js — 代码驱动模式的“简单指令解析器”。
+ * CommandParser.js — 代码驱动模式的“C/C++ 风格轻量解析器”。
  *
- * 不是真正的编译器：把用户输入的伪代码逐行解析成若干条指令，
+ * 不是真正的编译器：把用户输入的 C 风格伪代码逐行解析成若干条“与数据结构相关的”指令，
  * 再借助数据结构层的 plan* 方法，逐条展开成可交给 Animator 播放的 Step 序列。
  *
- * 支持的语法（大小写不敏感，`//` 为注释，语句可用 `;` 分隔，也支持一行一条）：
- *   arr[i] = v;             修改下标 i 的值为 v（i 在 [0, length-1]）
- *   insert(arr, i, v);      在下标 i 插入 v（i 在 [0, length]）
- *   insert(arr, v);         在末尾追加 v
- *   remove(arr, i);         删除下标 i（i 在 [0, length-1]）
- *   delete(arr, i);         同上
- *   search(arr, v);         查找 v
+ * 支持识别的语法（大小写不敏感，`//` 为注释，语句可用 `;` 分隔）：
+ *   int arr[10] = {10, 20, 5};   声明并初始化数组（容量 10，前三个元素初始值）
+ *   int arr[10];                 仅声明容量
+ *   arr[1] = 20;                 修改下标 1 的值为 20
+ *   insert(arr, 1, 20);          在下标 1 插入 20
+ *   insert(arr, 20);             末尾追加 20
+ *   remove(arr, 0); / delete(arr, 0);  删除下标 0
+ *   search(arr, 20);             查找 20
+ *   push(stack, 10);             栈/队列入队 —— 映射为“数组末尾追加”
+ *   pop(stack);                  栈/队列出队 —— 映射为“删除数组末尾元素”
+ *
+ * 其余无法识别的内容（#include、printf、for、return、花括号等）会被静默忽略，不报错。
  *
  * 每个指令最终会带一个 line 字段（1 起始的代码行号），Animator 据此高亮代码行。
  */
-import { STEP } from './Step.js';
+import { STEP, makeStep } from './Step.js';
+
+const IDENT = '[a-zA-Z_]\\w*';
 
 export class CommandParser {
   /**
    * 解析整段代码。
    * @param {string} code
-   * @returns {{commands: Array<{type:string,index:number|null,value:number,line:number}>, errors: Array<{line:number,text:string}>}}
+   * @returns {{
+   *   commands: Array<{type:string,index:number|null,value:number,line:number}>,
+   *   declaration: {capacity:number,values:number[],line:number}|null,
+   *   ignoredCount: number
+   * }}
    */
   static parse(code) {
     const commands = [];
-    const errors = [];
+    let declaration = null;
+    let ignoredCount = 0;
+
     const lines = String(code || '').split(/\r?\n/);
 
     for (let i = 0; i < lines.length; i++) {
@@ -33,18 +46,39 @@ export class CommandParser {
       // 去掉 // 注释
       const cIdx = line.indexOf('//');
       if (cIdx >= 0) line = line.slice(0, cIdx);
+
       // 以 ; 分隔（支持一行多条语句）
       const parts = line.split(';');
       for (const raw of parts) {
         const stmt = raw.trim();
         if (!stmt) continue;
+
+        // 声明：int arr[N] = {...} 或 int arr[N];
+        const dm = stmt.match(new RegExp('^int\\s+' + IDENT + '\\s*\\[\\s*(\\d+)\\s*\\]\\s*(?:=\\s*\\{([^{}]*)\\})?$', 'i'));
+        if (dm) {
+          if (!declaration) {
+            declaration = {
+              capacity: +dm[1],
+              values: CommandParser._parseInitializer(dm[2]),
+              line: lineNo,
+            };
+          }
+          continue;
+        }
+
         const cmd = CommandParser._parseStmt(stmt, lineNo);
         if (cmd) commands.push(cmd);
-        else errors.push({ line: lineNo, text: stmt });
+        else ignoredCount++; // 无法识别的内容：静默忽略
       }
     }
 
-    return { commands, errors };
+    return { commands, declaration, ignoredCount };
+  }
+
+  /** 解析初始化列表 "10, 20, 5" -> [10, 20, 5]。 */
+  static _parseInitializer(s) {
+    if (!s) return [];
+    return s.split(',').map((x) => parseInt(x.trim(), 10)).filter((n) => Number.isFinite(n));
   }
 
   /** 解析单条语句。返回指令对象，无法识别时返回 null。 */
@@ -52,49 +86,70 @@ export class CommandParser {
     let m;
 
     // arr[i] = v
-    m = stmt.match(/^arr\s*\[\s*(-?\d+)\s*\]\s*=\s*(-?\d+)$/i);
-    if (m) return { type: 'set', index: +m[1], value: +m[2], line };
+    m = stmt.match(new RegExp('^(' + IDENT + ')\\s*\\[\\s*(-?\\d+)\\s*\\]\\s*=\\s*(-?\\d+)$', 'i'));
+    if (m) return { type: 'set', index: +m[2], value: +m[3], line };
 
-    // insert(arr, i, v)
-    m = stmt.match(/^insert\s*\(\s*arr\s*,\s*(-?\d+)\s*,\s*(-?\d+)\s*\)$/i);
+    // insert(arr, i, v) —— 三个参数
+    m = stmt.match(new RegExp('^insert\\s*\\(\\s*' + IDENT + '\\s*,\\s*(-?\\d+)\\s*,\\s*(-?\\d+)\\s*\\)$', 'i'));
     if (m) return { type: 'insert', index: +m[1], value: +m[2], line };
 
-    // insert(arr, v) —— 末尾追加
-    m = stmt.match(/^insert\s*\(\s*arr\s*,\s*(-?\d+)\s*\)$/i);
+    // insert(arr, v) —— 两个参数（末尾追加）
+    m = stmt.match(new RegExp('^insert\\s*\\(\\s*' + IDENT + '\\s*,\\s*(-?\\d+)\\s*\\)$', 'i'));
     if (m) return { type: 'insert', index: null, value: +m[1], line };
 
     // remove(arr, i) / delete(arr, i)
-    m = stmt.match(/^(?:remove|delete)\s*\(\s*arr\s*,\s*(-?\d+)\s*\)$/i);
+    m = stmt.match(new RegExp('^(?:remove|delete)\\s*\\(\\s*' + IDENT + '\\s*,\\s*(-?\\d+)\\s*\\)$', 'i'));
     if (m) return { type: 'remove', index: +m[1], line };
 
     // search(arr, v)
-    m = stmt.match(/^search\s*\(\s*arr\s*,\s*(-?\d+)\s*\)$/i);
+    m = stmt.match(new RegExp('^search\\s*\\(\\s*' + IDENT + '\\s*,\\s*(-?\\d+)\\s*\\)$', 'i'));
     if (m) return { type: 'search', index: null, value: +m[1], line };
+
+    // push(stack, v) —— 栈/队列入队，映射为末尾追加
+    m = stmt.match(new RegExp('^push\\s*\\(\\s*' + IDENT + '\\s*,\\s*(-?\\d+)\\s*\\)$', 'i'));
+    if (m) return { type: 'push', index: null, value: +m[1], line };
+
+    // pop(stack) —— 栈/队列出队，映射为删除末尾
+    m = stmt.match(new RegExp('^pop\\s*\\(\\s*' + IDENT + '\\s*\\)$', 'i'));
+    if (m) return { type: 'pop', index: null, value: null, line };
 
     return null;
   }
 
   /**
-   * 把解析出的指令序列展开成 Step 列表。
+   * 把解析结果展开成 Step 列表。
    * 连续规划多行时，用 len 追踪“当前长度”、用 sim 模拟元素值，
    * 保证各行的 move/set 目标与实际执行一致；遇到非法指令则停止并记录错误。
    *
    * @param {import('../structures/ArrayDS.js').ArrayDS} array
    * @param {Array<{type:string,index:number|null,value:number,line:number}>} commands
+   * @param {{capacity:number,values:number[],line:number}|null} declaration
    * @returns {{steps:Array<object>, errors:Array<{line:number,msg:{zh:string,en:string}}>}}
    */
-  static buildSteps(array, commands) {
+  static buildSteps(array, commands, declaration = null) {
     const steps = [];
     const errors = [];
-    let len = array.length;
 
     // 用块 id -> value 模拟当前元素值，避免连续规划时读到“旧”内存。
     const sim = new Map();
-    for (const b of array.slots) {
-      if (b.value !== null) sim.set(b.id, b.value);
-    }
     const simMem = { read: (id) => (sim.has(id) ? sim.get(id) : null) };
+    let len = 0;
 
+    // 1) 声明初始化：把 { ... } 里的值依次写入槽位。
+    if (declaration) {
+      declaration.values.forEach((v, i) => {
+        const st = makeStep(STEP.SET_VALUE, { block: array.slots[i].id, value: v }, {
+          zh: `初始化 arr[${i}] = ${v}`,
+          en: `Initialize arr[${i}] = ${v}`,
+        });
+        st.line = declaration.line;
+        steps.push(st);
+        sim.set(array.slots[i].id, v);
+      });
+      len = declaration.values.length;
+    }
+
+    // 2) 逐条指令展开。
     for (const c of commands) {
       const before = errors.length;
       let s = [];
@@ -127,6 +182,22 @@ export class CommandParser {
         }
         case 'search': {
           s = array.planSearch(c.value, len, simMem);
+          break;
+        }
+        case 'push': {
+          if (len >= array.capacity) {
+            errors.push(CommandParser._err(c.line, `无法入栈/入队（数组已满 ${len}）`, `Cannot push (array full, length ${len})`));
+          } else {
+            s = array.planInsert(len, c.value, len, simMem);
+          }
+          break;
+        }
+        case 'pop': {
+          if (len <= 0) {
+            errors.push(CommandParser._err(c.line, `无法出栈/出队（当前为空）`, `Cannot pop (empty)`));
+          } else {
+            s = array.planDelete(len - 1, len, simMem);
+          }
           break;
         }
         default:
@@ -167,8 +238,8 @@ export class CommandParser {
 
   /** 根据指令类型推进“当前长度”。 */
   static _nextLen(type, len) {
-    if (type === 'insert') return len + 1;
-    if (type === 'remove') return len - 1;
+    if (type === 'insert' || type === 'push') return len + 1;
+    if (type === 'remove' || type === 'pop') return len - 1;
     return len;
   }
 

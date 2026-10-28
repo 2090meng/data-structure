@@ -26,8 +26,12 @@ export class Animator {
     this.playing = false;     // 是否处于自动播放中
     this.generation = 0;      // 用于中断重置：reset 后递增，使进行中的异步执行作废
     this._currentLine = null; // 当前高亮的代码行号（1 起始）
-    this.stepDelay = 520;     // 自动播放时步骤之间的停顿(ms)
-    this.compareDelay = 500;  // 单次比较闪烁时长(ms)
+    this.speed = 400;         // 速度对应的毫秒延迟（0 = 瞬间），由 setSpeed 调整
+  }
+
+  /** 设置播放速度（毫秒，0 表示瞬间）。 */
+  setSpeed(ms) {
+    this.speed = Number(ms) || 0;
   }
 
   /** 是否还有待执行步骤或正在自动播放。 */
@@ -62,7 +66,7 @@ export class Animator {
       const step = this.queue.shift();
       await this._execute(step, gen);
       if (gen !== this.generation) break;
-      await sleep(this.stepDelay);
+      await sleep(this.speed);
     }
     this.playing = false;
   }
@@ -108,7 +112,7 @@ export class Animator {
         const value = this.memory.read(from);
         this.memory.clear(from); // 先清空源块，避免与漂浮文本重叠显示
         this.renderer.render(this.memory);
-        await this.renderer.animateFloat(from, to, value, 420);
+        await this.renderer.animateFloat(from, to, value, this.speed);
         if (gen !== this.generation) return;
         this.memory.write(to, value);
         this.renderer.render(this.memory);
@@ -122,7 +126,7 @@ export class Animator {
         if (b) b.highlight = true;
         this.memory.write(block, value);
         this.renderer.render(this.memory);
-        await sleep(360);
+        await sleep(this.speed);
         if (gen !== this.generation) return;
         if (b) b.highlight = false;
         this.renderer.render(this.memory);
@@ -135,7 +139,7 @@ export class Animator {
         const b = this.memory.getBlock(block);
         if (b) b.highlight = true;
         this.renderer.render(this.memory);
-        await sleep(300);
+        await sleep(this.speed);
         if (gen !== this.generation) return;
         this.memory.clear(block);
         if (b) b.highlight = false;
@@ -149,7 +153,7 @@ export class Animator {
         const b = this.memory.getBlock(block);
         if (b) b.highlight = true;
         this.renderer.render(this.memory);
-        await sleep(this.compareDelay);
+        await sleep(this.speed);
         if (gen !== this.generation) return;
         if (b) b.highlight = false;
         this.renderer.render(this.memory);

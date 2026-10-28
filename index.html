@@ -93,16 +93,18 @@
         <textarea id="code-input" class="code-input" spellcheck="false"></textarea>
         <div id="code-view" class="code-view"></div>
         <div class="code-hint zh">
-          每行一条指令（大小写不敏感，<code>//</code> 注释，<code>;</code> 分隔）：
-          <code>arr[0] = 5;</code> 修改下标；<code>insert(arr, 2, 5);</code> 插入；
-          <code>insert(arr, 5);</code> 末尾追加；<code>remove(arr, 0);</code> 删除；
-          <code>search(arr, 5);</code> 查找。
+          支持 C/C++ 风格（大小写不敏感，<code>//</code> 注释，<code>;</code> 分隔；<code>#include</code>、<code>printf</code>、<code>for</code> 等会被忽略）：
+          <code>int arr[10] = {10, 20, 5};</code> 声明并初始化；
+          <code>arr[1] = 20;</code> 修改；<code>insert(arr, 2, 5);</code> 插入；
+          <code>push(arr, 7);</code> 入栈/队；<code>pop(arr);</code> 出栈/队；
+          <code>remove(arr, 0);</code> 删除；<code>search(arr, 5);</code> 查找。
         </div>
         <div class="code-hint en">
-          One command per line (case-insensitive, <code>//</code> comments, <code>;</code> separator):
-          <code>arr[0] = 5;</code> set; <code>insert(arr, 2, 5);</code> insert;
-          <code>insert(arr, 5);</code> append; <code>remove(arr, 0);</code> delete;
-          <code>search(arr, 5);</code> search.
+          C/C++-style (case-insensitive, <code>//</code> comments, <code>;</code> separator; <code>#include</code>, <code>printf</code>, <code>for</code> etc. are ignored):
+          <code>int arr[10] = {10, 20, 5};</code> declare &amp; initialize;
+          <code>arr[1] = 20;</code> set; <code>insert(arr, 2, 5);</code> insert;
+          <code>push(arr, 7);</code> push; <code>pop(arr);</code> pop;
+          <code>remove(arr, 0);</code> delete; <code>search(arr, 5);</code> search.
         </div>
         <button id="run-code-btn" class="btn btn--primary">
           <span class="zh">运行代码</span><span class="en">Run Code</span>
@@ -122,6 +124,16 @@
           <button id="reset-btn" class="btn btn--danger">
             <span class="zh">重置</span><span class="en">Reset</span>
           </button>
+        </div>
+        <div class="field">
+          <label class="field__label zh" for="speed-select">速度</label>
+          <label class="field__label en" for="speed-select">Speed</label>
+          <select id="speed-select">
+            <option value="slow">慢速 Slow (800ms)</option>
+            <option value="normal" selected>正常 Normal (400ms)</option>
+            <option value="fast">快速 Fast (100ms)</option>
+            <option value="instant">极速 Instant</option>
+          </select>
         </div>
       </section>
 

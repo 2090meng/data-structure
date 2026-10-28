@@ -32,6 +32,7 @@ const logList = document.getElementById('log-list');
 const codeInput = document.getElementById('code-input');
 const runCodeBtn = document.getElementById('run-code-btn');
 const codeView = document.getElementById('code-view');
+const speedSelect = document.getElementById('speed-select');
 
 // ---------- 3. 创建核心对象 ----------
 let memory = new MemoryModel();
@@ -39,6 +40,9 @@ const renderer = new Renderer(svg);
 let array = new ArrayDS(memory, 8); // 默认数组，容量 8
 
 const animator = new Animator(memory, renderer, (text) => addLog(text), (line) => setActiveLine(line));
+
+// 速度档位（毫秒）→ 与 HTML 中 speed-select 的 option value 对应
+const SPEED_MAP = { slow: 800, normal: 400, fast: 100, instant: 0 };
 
 // ---------- 4. 工具函数 ----------
 /** 向日志区追加一条步骤说明（自动按当前语言翻译）。 */
@@ -72,10 +76,10 @@ function parseIntValue(input) {
 }
 
 // ---------- 5. 重置 ----------
-function resetAll() {
+function resetAll(capacity = 8) {
   animator.reset();                     // 中断播放、清空队列
   memory = new MemoryModel();           // 重建内存
-  array = new ArrayDS(memory, 8);       // 重建数组结构
+  array = new ArrayDS(memory, capacity); // 重建数组结构（容量可被代码声明覆盖）
   animator.memory = memory;             // 让动画引擎指向新内存
   renderer.render(memory);              // 重绘
   clearLog();
@@ -164,23 +168,22 @@ function setActiveLine(line) {
 
 /** 解析并装载代码，生成动画步骤（每次从初始数组状态开始运行）。 */
 function runCode() {
-  resetAll();                 // 每次都以初始状态运行，保证结果确定
   syncCodeView();
 
-  const { commands, errors } = CommandParser.parse(codeInput.value);
-  if (errors.length) {
-    for (const e of errors) {
-      addLog({ zh: `第 ${e.line} 行语法错误：${e.text}`, en: `Syntax error at line ${e.line}: ${e.text}` });
-    }
-    animator.reset();
-    setActiveLine(null);
-    return;
+  const { commands, declaration, ignoredCount } = CommandParser.parse(codeInput.value);
+
+  // 声明决定容量（默认 8，且不小于初始化元素个数）
+  const capacity = declaration ? Math.max(declaration.capacity, declaration.values.length, 1) : 8;
+  resetAll(capacity);
+
+  if (ignoredCount > 0) {
+    addLog({ zh: `已忽略 ${ignoredCount} 条无法识别的语句`, en: `Ignored ${ignoredCount} unrecognized statement(s)` });
   }
 
-  const { steps, errors: runErrors } = CommandParser.buildSteps(array, commands);
-  for (const e of runErrors) addLog(e.msg);
+  const { steps, errors } = CommandParser.buildSteps(array, commands, declaration);
+  for (const e of errors) addLog(e.msg);
   if (!steps.length) {
-    if (!runErrors.length) addLog({ zh: '没有可执行的指令', en: 'No executable commands' });
+    if (!errors.length) addLog({ zh: '没有可执行的指令', en: 'No executable commands' });
     animator.reset();
     setActiveLine(null);
     return;
@@ -199,18 +202,26 @@ runCodeBtn.addEventListener('click', runCode);
 codeInput.addEventListener('input', syncCodeView);
 opSelect.addEventListener('change', syncFields);
 langSelect.addEventListener('change', () => i18n.setLang(langSelect.value));
+speedSelect.addEventListener('change', () => animator.setSpeed(SPEED_MAP[speedSelect.value]));
 
 // ---------- 8. 初始渲染 ----------
-// 预填一段示例代码，方便第一次直接点击「运行代码」体验
+// 预填一段 C 风格示例代码，方便第一次直接点击「运行代码」体验
 codeInput.value = [
-  '// 示例：数组操作伪代码',
-  'insert(arr, 0, 10);',
-  'insert(arr, 1, 20);',
-  'arr[0] = 99;',
-  'insert(arr, 5);',
-  'search(arr, 20);',
-  'remove(arr, 1);',
+  '// 示例：C 风格数组操作',
+  '#include <stdio.h>',
+  '',
+  'int main() {',
+  '  int arr[10] = {10, 20, 5};',
+  '',
+  '  arr[1] = 20;',
+  '  insert(arr, 1, 20);',
+  '  push(arr, 7);',
+  '  pop(arr);',
+  '  search(arr, 20);',
+  '  return 0;',
+  '}',
 ].join('\n');
 syncFields();
 syncCodeView();
+animator.setSpeed(SPEED_MAP[speedSelect.value]);
 renderer.render(memory);
