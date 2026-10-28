@@ -164,12 +164,29 @@ export class Renderer {
    */
   _drawPointers(view, vertical) {
     if (!view || !Array.isArray(view.pointers)) return;
+    // 队列满时 rear 与 front 指向同一个块（(rear+1)%MaxSize == front），
+    // 同一块上的多个指针需要错开，否则文字会重叠。
+    const used = new Map();
     for (const p of view.pointers) {
       const pos = this.positions[p.blockId];
       if (!pos) continue;
+      const duplicate = used.get(p.blockId) || 0;
+      used.set(p.blockId, duplicate + 1);
+
       const attrs = vertical
-        ? { x: pos.x - 16, y: pos.cy, class: 'mem-ptr', 'text-anchor': 'end', 'dominant-baseline': 'central' }
-        : { x: pos.cx, y: pos.y + pos.h + 42, class: 'mem-ptr', 'text-anchor': 'middle' };
+        ? {
+            x: pos.x - 16,
+            y: pos.cy + duplicate * 18,
+            class: 'mem-ptr',
+            'text-anchor': 'end',
+            'dominant-baseline': 'central',
+          }
+        : {
+            x: pos.cx,
+            y: pos.y + pos.h + 42 + duplicate * 18,
+            class: 'mem-ptr',
+            'text-anchor': 'middle',
+          };
       const txt = this._el('text', attrs);
       txt.textContent = vertical ? p.label + ' →' : '▲ ' + p.label;
       this.svg.appendChild(txt);

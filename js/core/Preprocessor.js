@@ -53,8 +53,10 @@ export class Preprocessor {
     text = text.replace(SWAP_PATTERN, (m, tmp, i1, i2, j1, i3) =>
       i1 === i2 && i3 === j1 && i1 !== j1 ? `swap(${i1}, ${j1});` : m
     );
-    text = text.replace(INSERT_PATTERN, (m, k, v) => `insert(arr, ${k}, ${v});`);
-    text = text.replace(DELETE_PATTERN, (m, k) => `remove(arr, ${k});`);
+    // C 的 arr[k] 是物理下标（0 起始），教材 insert/remove 用位序（1 起始）：
+    // 下标 k 对应的位序是 k + 1，这里直接换算，保证动画与 C 代码语义一致。
+    text = text.replace(INSERT_PATTERN, (m, k, v) => `insert(arr, ${Number(k) + 1}, ${v});`);
+    text = text.replace(DELETE_PATTERN, (m, k) => `remove(arr, ${Number(k) + 1});`);
 
     const lines = text.split(/\r?\n/);
 

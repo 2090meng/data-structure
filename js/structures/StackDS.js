@@ -1,8 +1,12 @@
 /**
  * StackDS.js — 栈（顺序栈，连续内存分配）。
  *
- * 栈只在【栈顶】操作，后进先出（LIFO）：
- *   slots[0] 是栈底，slots[length-1] 是栈顶，未使用的槽位保持空值。
+ * 语义按考研教材（严蔚敏《数据结构》C 语言版）：
+ *   S.top 指向【栈顶元素的下一个位置】（即下一个空槽位），初值 S.top = 0。
+ *   入栈：S.data[S.top] = x; S.top++;   —— 先录入数据，再让栈顶指针上移
+ *   出栈：S.top--; e = S.data[S.top];   —— 先让栈顶指针下移，再取出数据
+ *   栈空：S.top == 0；栈满：S.top == MaxSize
+ *   slots[0] 是栈底，slots[length-1] 是最上面的元素，length 与 S.top 数值相同。
  *
  * 与 ArrayDS 一样只是“规划器”：plan* 只产出 Step 数组，不直接改画面，
  * 真正的内存推进由 Animator 逐步完成。为了能被代码模式复用，
@@ -20,16 +24,16 @@ export class StackDS {
     this.memory = memory;
     this.capacity = capacity;
     this.slots = memory.allocateContiguous(capacity);
-    this.length = 0; // 栈中元素个数，栈顶下标 = length - 1
+    this.length = 0; // 栈中元素个数；S.top 指向下一个空位，数值上等于 length
 
     this.slots.forEach((b, i) => {
       b.meta.label = '[' + i + ']';
     });
   }
 
-  /** 栈顶下标（空栈为 -1）。 */
+  /** 栈顶指针 S.top：指向栈顶元素的下一个位置（空栈为 0，栈满为 capacity）。 */
   get top() {
-    return this.length - 1;
+    return this.length;
   }
 
   /** 代码模式声明初始化后，同步元素个数（栈底固定从 0 开始）。 */
@@ -66,22 +70,27 @@ export class StackDS {
     return null;
   }
 
-  /** 规划：入栈——把 value 写到 slots[length]，然后元素个数 +1。 */
+  /** 规划：入栈——教材 `S.data[S.top] = x; S.top++`（先写数据，指针再上移）。 */
   planPush(value, len = this.length, mem = this.memory) {
     const steps = [];
     if (len < 0 || len >= this.capacity) return steps; // 栈满：由调用方报错
 
     steps.push(
       makeStep(STEP.SET_VALUE, { block: this.slots[len].id, value }, {
-        zh: `入栈：把 ${value} 压入栈顶（槽位 [${len}]）`,
-        en: `Push ${value} onto the stack top (slot [${len}])`,
+        zh: `入栈：S.data[S.top] = ${value}（S.top = ${len}，先录入数据）`,
+        en: `Push: S.data[S.top] = ${value} (S.top = ${len}, store data first)`,
       })
     );
-    steps.push(makeStep(STEP.META, { run: () => { this.length++; }, undo: () => { this.length--; } }));
+    steps.push(
+      makeStep(STEP.META, { run: () => { this.length++; }, undo: () => { this.length--; } }, {
+        zh: `S.top++ → S.top = ${len + 1}（栈顶指针移到下一个地址）`,
+        en: `S.top++ → S.top = ${len + 1} (top pointer moves to the next address)`,
+      })
+    );
     return steps;
   }
 
-  /** 规划：出栈——先高亮栈顶，再清空它，最后元素个数 -1。 */
+  /** 规划：出栈——教材 `S.top--; e = S.data[S.top]`（指针先下移，再取数据）。 */
   planPop(len = this.length, mem = this.memory) {
     const steps = [];
     if (len <= 0) return steps; // 空栈：由调用方报错
@@ -92,18 +101,23 @@ export class StackDS {
 
     steps.push(
       makeStep(STEP.HIGHLIGHT, { block: id }, {
-        zh: `出栈：栈顶为 ${v}（槽位 [${idx}]）`,
-        en: `Pop: stack top is ${v} (slot [${idx}])`,
+        zh: `出栈：S.top--（${len} → ${idx}），准备取出 S.data[${idx}]`,
+        en: `Pop: S.top-- (${len} → ${idx}), about to read S.data[${idx}]`,
+      })
+    );
+    steps.push(
+      makeStep(STEP.META, { run: () => { this.length--; }, undo: () => { this.length++; } }, {
+        zh: `S.top-- → S.top = ${idx}（栈顶指针先下移）`,
+        en: `S.top-- → S.top = ${idx} (top pointer moves down first)`,
       })
     );
     steps.push(
       makeStep(STEP.CLEAR_VALUE, { block: id }, {
-        zh: `元素 ${v} 已从栈顶弹出`,
-        en: `Element ${v} popped from the top`,
+        zh: `e = S.data[${idx}] = ${v}，元素 ${v} 已出栈`,
+        en: `e = S.data[${idx}] = ${v}; element ${v} popped`,
       })
     );
     steps.push(makeStep(STEP.UNHIGHLIGHT, { block: id }));
-    steps.push(makeStep(STEP.META, { run: () => { this.length--; }, undo: () => { this.length++; } }));
     return steps;
   }
 
@@ -118,8 +132,8 @@ export class StackDS {
 
     steps.push(
       makeStep(STEP.HIGHLIGHT, { block: id }, {
-        zh: `取栈顶：槽位 [${idx}] 的值为 ${v}`,
-        en: `Peek: value at slot [${idx}] is ${v}`,
+        zh: `取栈顶：e = S.data[S.top-1] = S.data[${idx}] = ${v}`,
+        en: `Peek: e = S.data[S.top-1] = S.data[${idx}] = ${v}`,
       })
     );
     steps.push(
@@ -163,21 +177,21 @@ export class StackDS {
     return steps;
   }
 
-  /** 代码模式兼容：只有“在栈顶插入”（index === 元素个数）才等价于入栈。 */
+  /** 代码模式兼容：位序 index 恰好是栈顶的下一个位置（len+1）时等价于入栈。 */
   planInsert(index, value, len = this.length, mem = this.memory) {
-    if (index !== len) return [];
+    if (index !== len + 1) return [];
     return this.planPush(value, len, mem);
   }
 
-  /** 代码模式兼容：只有“删除栈顶”（index === 元素个数-1）才等价于出栈。 */
+  /** 代码模式兼容：位序 index 恰好是栈顶元素（len）时等价于出栈。 */
   planDelete(index, len = this.length, mem = this.memory) {
-    if (index !== len - 1) return [];
+    if (index !== len) return [];
     return this.planPop(len, mem);
   }
 
-  /** 渲染视图描述：竖排（栈底在下），并标示栈顶指针 top。 */
+  /** 渲染视图描述：竖排（栈底在下），top 指向栈顶元素的下一个空槽位。 */
   view() {
-    const idx = Math.max(0, Math.min(this.length - 1, this.slots.length - 1));
+    const idx = Math.max(0, Math.min(this.length, this.slots.length - 1));
     return {
       layout: 'column',
       title: 'Stack / 栈',

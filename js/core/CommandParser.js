@@ -202,11 +202,18 @@ export class CommandParser {
     const simMem = { read: (id) => (sim.has(id) ? sim.get(id) : null) };
     const kind = structure.kind || 'array';
     let len = 0;
+    // 队列的“规划期队头”：代码模式一次性规划多行，真实 front 要等动画执行到
+    // META 步骤才会变，因此必须自己推进，否则出队后的下次入队会覆盖旧槽位。
+    let front = kind === 'queue' ? structure.front % structure.capacity : 0;
 
     // 1) 声明初始化：把 { ... } 里的值依次写入槽位（超出容量的部分忽略）。
+    //    循环队列牺牲一个单元，可存元素最多 MaxSize-1 个，初始化也要按这个上限截断。
     if (declaration) {
+      const limit = kind === 'queue'
+        ? Math.min(structure.slots.length, structure.maxSize)
+        : structure.slots.length;
       declaration.values.forEach((v, i) => {
-        if (i >= structure.slots.length) return;
+        if (i >= limit) return;
         const st = makeStep(STEP.SET_VALUE, { block: structure.slots[i].id, value: v }, {
           zh: `初始化 [${i}] = ${v}`,
           en: `Initialize [${i}] = ${v}`,
@@ -215,7 +222,7 @@ export class CommandParser {
         steps.push(st);
         sim.set(structure.slots[i].id, v);
       });
-      len = Math.min(declaration.values.length, structure.slots.length);
+      len = Math.min(declaration.values.length, limit);
     }
 
     // 2) 逐条指令展开。
@@ -225,29 +232,31 @@ export class CommandParser {
 
       switch (c.type) {
         case 'set': {
+          // arr[i] / set(i, v)：按 C 语义使用物理下标（0 起始）。
           if (kind !== 'array') {
             errors.push(CommandParser._kindErr(c.line, kind));
           } else if (c.index < 0 || c.index >= len) {
-            errors.push(CommandParser._err(c.line, `错误：数组下标 ${c.index} 越界（当前长度 ${len}）`, `Error: index ${c.index} out of range (length ${len})`));
+            errors.push(CommandParser._err(c.line, `错误：数组下标 ${c.index} 越界（当前长度 ${len}，下标 0..${len - 1}）`, `Error: index ${c.index} out of range (length ${len}, index 0..${len - 1})`));
           } else {
-            s = structure.planSet(c.index, c.value, len);
+            s = structure.planSet(c.index + 1, c.value, len);
           }
           break;
         }
         case 'insert': {
-          const idx = c.index === null ? len : c.index;
+          // insert 的位置按教材位序（1 起始）：第 len+1 个位置即表尾追加。
+          const pos = c.index === null ? len + 1 : c.index;
           if (kind === 'stack') {
-            if (idx !== len) {
+            if (pos !== len + 1) {
               errors.push(CommandParser._err(c.line, '错误：栈只能在栈顶插入，请使用 push', 'Error: a stack only allows insertion at the top, use push'));
             } else {
               s = structure.planPush(c.value, len, simMem);
             }
           } else if (kind === 'queue') {
             errors.push(CommandParser._kindErr(c.line, kind));
-          } else if (idx < 0 || idx > len || len >= structure.capacity) {
-            errors.push(CommandParser._err(c.line, `错误：数组下标 ${idx} 越界或数组已满`, `Error: index ${idx} out of range or array full`));
+          } else if (pos < 1 || pos > len + 1 || len >= structure.capacity) {
+            errors.push(CommandParser._err(c.line, `错误：插入位序 ${pos} 越界（应为 1..${len + 1}）或数组已满`, `Error: position ${pos} out of range (1..${len + 1}) or array full`));
           } else {
-            s = structure.planInsert(idx, c.value, len, simMem);
+            s = structure.planInsert(pos, c.value, len, simMem);
           }
           break;
         }
@@ -255,51 +264,54 @@ export class CommandParser {
           if (len === 0) {
             errors.push(CommandParser._err(c.line, `当前结构为空，无法操作`, `The structure is empty`));
           } else if (kind === 'stack') {
-            if (c.index !== len - 1) {
-              errors.push(CommandParser._err(c.line, '错误：栈只能弹出栈顶元素，请使用 pop', 'Error: a stack only allows popping the top, use pop'));
+            if (c.index !== len) {
+              errors.push(CommandParser._err(c.line, `错误：栈只能弹出栈顶（第 ${len} 个），请使用 pop`, `Error: a stack only allows popping the top (element ${len}), use pop`));
             } else {
               s = structure.planPop(len, simMem);
             }
           } else if (kind === 'queue') {
-            if (c.index !== 0) {
-              errors.push(CommandParser._err(c.line, '错误：队列只能从队头出队，请使用 dequeue', 'Error: a queue only allows dequeuing from the front, use dequeue'));
+            if (c.index !== 1) {
+              errors.push(CommandParser._err(c.line, '错误：队列只能从队头出队（第 1 个），请使用 dequeue', 'Error: a queue only allows dequeuing the front (element 1), use dequeue'));
             } else {
-              s = structure.planDequeue(len, simMem);
+              s = structure.planDequeue(len, simMem, front);
             }
-          } else if (c.index < 0 || c.index >= len) {
-            errors.push(CommandParser._err(c.line, `错误：数组下标 ${c.index} 越界（当前长度 ${len}）`, `Error: index ${c.index} out of range (length ${len})`));
+          } else if (c.index < 1 || c.index > len) {
+            errors.push(CommandParser._err(c.line, `错误：删除位序 ${c.index} 越界（应为 1..${len}）`, `Error: position ${c.index} out of range (1..${len})`));
           } else {
             s = structure.planDelete(c.index, len, simMem);
           }
           break;
         }
         case 'swap': {
+          // swap(i, j) 同样使用 C 物理下标（0 起始）。
           if (kind !== 'array') {
             errors.push(CommandParser._kindErr(c.line, kind));
           } else {
             const ia = c.index;
             const ib = c.index2;
             if (ia < 0 || ia >= len || ib < 0 || ib >= len) {
-              errors.push(CommandParser._err(c.line, `错误：数组下标越界（当前长度 ${len}）`, `Error: index out of range (length ${len})`));
+              errors.push(CommandParser._err(c.line, `错误：数组下标越界（当前长度 ${len}，下标 0..${len - 1}）`, `Error: index out of range (length ${len}, index 0..${len - 1})`));
             } else if (ia !== ib) {
-              s = structure.planSwap(ia, ib, len);
+              s = structure.planSwap(ia + 1, ib + 1, len);
             }
           }
           break;
         }
         case 'search': {
-          s = structure.planSearch(c.value, len, simMem);
+          s = structure.planSearch(c.value, len, simMem, front);
           break;
         }
         case 'push': {
-          if (len >= structure.capacity) {
+          if (kind === 'queue') {
+            const err = structure.enqueueError(len, front, simMem);
+            if (err) errors.push(CommandParser._errMsg(c.line, err));
+            else s = structure.planEnqueue(c.value, len, simMem, front);
+          } else if (len >= structure.capacity) {
             errors.push(CommandParser._err(c.line, `无法入栈/入队（已满 ${len}/${structure.capacity}）`, `Cannot push (structure full, ${len}/${structure.capacity})`));
           } else if (kind === 'stack') {
             s = structure.planPush(c.value, len, simMem);
-          } else if (kind === 'queue') {
-            s = structure.planEnqueue(c.value, len, simMem);
           } else {
-            s = structure.planInsert(len, c.value, len, simMem);
+            s = structure.planInsert(len + 1, c.value, len, simMem); // 第 len+1 个位置 = 表尾追加
           }
           break;
         }
@@ -309,29 +321,29 @@ export class CommandParser {
           } else if (kind === 'stack') {
             s = structure.planPop(len, simMem);
           } else if (kind === 'queue') {
-            s = structure.planDequeue(len, simMem);
+            s = structure.planDequeue(len, simMem, front);
           } else {
-            s = structure.planDelete(len - 1, len, simMem);
+            s = structure.planDelete(len, len, simMem); // 删除第 len 个 = 表尾
           }
           break;
         }
         case 'enqueue': {
           if (kind !== 'queue') {
             errors.push(CommandParser._err(c.line, '错误：当前结构不是队列，不能使用 enqueue', 'Error: the current structure is not a queue, enqueue is unavailable'));
-          } else if (len >= structure.capacity) {
-            errors.push(CommandParser._err(c.line, `无法入队（队列已满 ${len}/${structure.capacity}）`, `Cannot enqueue (queue full, ${len}/${structure.capacity})`));
           } else {
-            s = structure.planEnqueue(c.value, len, simMem);
+            const err = structure.enqueueError(len, front, simMem);
+            if (err) errors.push(CommandParser._errMsg(c.line, err));
+            else s = structure.planEnqueue(c.value, len, simMem, front);
           }
           break;
         }
         case 'dequeue': {
           if (kind !== 'queue') {
             errors.push(CommandParser._err(c.line, '错误：当前结构不是队列，不能使用 dequeue', 'Error: the current structure is not a queue, dequeue is unavailable'));
-          } else if (len <= 0) {
-            errors.push(CommandParser._err(c.line, `当前结构为空，无法操作`, `The structure is empty`));
           } else {
-            s = structure.planDequeue(len, simMem);
+            const err = structure.dequeueError(len);
+            if (err) errors.push(CommandParser._errMsg(c.line, err));
+            else s = structure.planDequeue(len, simMem, front);
           }
           break;
         }
@@ -348,6 +360,13 @@ export class CommandParser {
       // 向前推进“模拟状态”，供下一行规划使用。
       CommandParser._simulate(sim, s);
       len = CommandParser._nextLen(c.type, len);
+
+      // 队列出队（dequeue / pop / remove(0)）后队头也要跟着推进，保持规划期状态一致。
+      const dequeued =
+        c.type === 'dequeue' || c.type === 'pop' || (c.type === 'remove' && c.index === 0);
+      if (kind === 'queue' && dequeued && s.length) {
+        front = (front + 1) % structure.capacity;
+      }
 
       steps.push(...s);
     }
@@ -403,5 +422,10 @@ export class CommandParser {
   /** 构造一个错误记录。 */
   static _err(line, zh, en) {
     return { line, msg: { zh, en } };
+  }
+
+  /** 构造错误记录（消息由结构层提供，保证 UI 与代码模式文案一致）。 */
+  static _errMsg(line, msg) {
+    return { line, msg };
   }
 }

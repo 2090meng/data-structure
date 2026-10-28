@@ -95,14 +95,14 @@ int main() {
     int length = 5;
     int capacity = 8;
 
-    // 操作 1：在下标 2 的位置插入元素 99
+    // 操作 1：在下标 2（即第 3 个位置）插入元素 99
     for (int i = length; i > 2; i--) {
         arr[i] = arr[i - 1]; // 从后往前挪，腾出空间
     }
     arr[2] = 99;
     length++; // 长度加 1
 
-    // 操作 2：删除下标 1 的元素（即 20）
+    // 操作 2：删除第 2 个元素（下标 1，即 20）
     for (int i = 1; i < length - 1; i++) {
         arr[i] = arr[i + 1]; // 从前往后挪，覆盖被删除的元素
     }
@@ -120,13 +120,13 @@ int main() {
   stack: `#include <stdio.h>
 
 int main() {
-    // 顺序栈：容量 8，只在栈顶操作，后进先出 LIFO
+    // 顺序栈：MaxSize = 8，S.top 指向下一个空位，后进先出 LIFO
     int st[8] = {10, 20, 30};
 
-    push(st, 40);   // 入栈 40，栈顶变为 40
-    push(st, 50);   // 再入栈 50，栈顶变为 50
-    pop(st);        // 弹出栈顶 50
-    push(st, 60);   // 再入栈 60
+    push(st, 40);   // S.data[S.top] = 40; S.top++（栈顶指针上移）
+    push(st, 50);   // S.data[S.top] = 50; S.top++
+    pop(st);        // S.top--; e = S.data[S.top]（弹出 50）
+    push(st, 60);   // S.data[S.top] = 60; S.top++
 
     printf("演示结束（打印语句会被忽略）\\n");
     return 0;
@@ -134,13 +134,13 @@ int main() {
   queue: `#include <stdio.h>
 
 int main() {
-    // 循环队列：容量 6，队尾入队、队头出队，先进先出 FIFO
-    int q[6] = {10, 20, 30};
+    // 循环队列：MaxSize = 7，牺牲一个单元判满，最多存 6 个元素
+    int q[7] = {10, 20, 30};
 
-    enqueue(q, 40);  // 入队 40
-    dequeue(q);      // 出队 10，front 后移
+    enqueue(q, 40);  // 入队：Q.data[Q.rear] = 40; Q.rear++
+    dequeue(q);      // 出队：e = Q.data[Q.front]; Q.front++
     enqueue(q, 50);  // 入队 50
-    enqueue(q, 60);  // 入队 60，槽位绕回环形空位
+    enqueue(q, 60);  // 入队 60
 
     printf("演示结束（打印语句会被忽略）\\n");
     return 0;
@@ -264,21 +264,21 @@ function execute() {
 
   if (structKind === 'array') {
     if (op === 'insert') {
-      if (index === null || value === null) return addLog({ zh: '请输入合法的下标和值', en: 'Invalid index or value' });
-      if (index < 0 || index > structure.length || structure.length >= structure.capacity) {
-        return addLog({ zh: `下标须在 0~${structure.length} 之间且数组未满`, en: `Index must be in 0~${structure.length} and array not full` });
+      if (index === null || value === null) return addLog({ zh: '请输入合法的位序和值', en: 'Invalid position or value' });
+      if (index < 1 || index > structure.length + 1 || structure.length >= structure.capacity) {
+        return addLog({ zh: `位序须在 1~${structure.length + 1} 之间且数组未满`, en: `Position must be in 1~${structure.length + 1} and array not full` });
       }
       steps = structure.planInsert(index, value);
     } else if (op === 'delete') {
-      if (index === null) return addLog({ zh: '请输入合法的下标', en: 'Invalid index' });
-      if (index < 0 || index >= structure.length) {
-        return addLog({ zh: `下标须在 0~${structure.length - 1} 之间`, en: `Index must be in 0~${structure.length - 1}` });
+      if (index === null) return addLog({ zh: '请输入合法的位序', en: 'Invalid position' });
+      if (index < 1 || index > structure.length) {
+        return addLog({ zh: `位序须在 1~${structure.length} 之间`, en: `Position must be in 1~${structure.length}` });
       }
       steps = structure.planDelete(index);
     } else if (op === 'set') {
-      if (index === null || value === null) return addLog({ zh: '请输入合法的下标和值', en: 'Invalid index or value' });
-      if (index < 0 || index >= structure.length) {
-        return addLog({ zh: `下标须在 0~${structure.length - 1} 之间`, en: `Index must be in 0~${structure.length - 1}` });
+      if (index === null || value === null) return addLog({ zh: '请输入合法的位序和值', en: 'Invalid position or value' });
+      if (index < 1 || index > structure.length) {
+        return addLog({ zh: `位序须在 1~${structure.length} 之间`, en: `Position must be in 1~${structure.length}` });
       }
       steps = structure.planSet(index, value);
     } else if (op === 'search') {
@@ -388,6 +388,14 @@ function runCode() {
   // 代码模式从“声明初始化”开始：让结构内部元素个数与初始化真实写入的数量一致，
   // 后续插入/删除/入栈出队的 length++/-- 才能累积出正确结果。
   if (declaration) structure.setInitialLength(declaration.values.length);
+
+  // 循环队列牺牲一个单元，初始化值超过 MaxSize-1 时多余部分会被忽略，这里明确提示。
+  if (declaration && structKind === 'queue' && declaration.values.length > structure.maxSize) {
+    addLog({
+      zh: `循环队列牺牲一个单元，最多存 ${structure.maxSize} 个，初始化时多余的 ${declaration.values.length - structure.maxSize} 个值已忽略`,
+      en: `Circular queue sacrifices one slot (max ${structure.maxSize}); ${declaration.values.length - structure.maxSize} extra initial value(s) ignored`,
+    }, true);
+  }
 
   if (cleaned.ignoredCount > 0) {
     addLog({ zh: `已忽略 ${cleaned.ignoredCount} 条无关语句`, en: `Ignored ${cleaned.ignoredCount} irrelevant statement(s)` });
