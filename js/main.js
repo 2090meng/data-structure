@@ -462,3 +462,9 @@ codeInput.value = SAMPLES.array;         // 预填 C 风格示例代码
 syncCodeView();
 animator.setSpeed(SPEED_MAP[speedSelect.value]);
 renderer.render(memory);
+
+// 手机上默认折叠「使用说明」，避免首屏被说明占满
+const helpBox = document.querySelector('.panel__help');
+if (helpBox && window.matchMedia('(max-width: 900px)').matches) {
+  helpBox.open = false;
+}

@@ -423,3 +423,75 @@ select:focus, input:focus, textarea:focus {
 /* 中英双语切换 / Bilingual visibility */
 body.lang-zh .en { display: none; }
 body.lang-en .zh { display: none; }
+
+/* ============================================================
+   响应式适配 / Responsive layout
+   ============================================================ */
+
+/* 平板与手机竖屏：固定双栏改为上下堆叠，整页纵向滚动 */
+@media (max-width: 900px) {
+  .layout {
+    grid-template-columns: 1fr;
+    height: auto;
+    min-height: calc(100vh - 65px);
+  }
+
+  .panel {
+    overflow: visible;
+  }
+
+  .visual__canvas {
+    min-height: 320px;
+  }
+
+  .log {
+    height: 160px;
+  }
+}
+
+/* 手机：放大触控目标，输入框 16px 避免 iOS 聚焦时自动缩放，画布横向滚动 */
+@media (max-width: 560px) {
+  .topbar {
+    flex-wrap: wrap;
+    gap: 8px;
+    padding: 10px 12px;
+  }
+
+  .topbar .title {
+    font-size: 16px;
+  }
+
+  .layout {
+    gap: 10px;
+    padding: 10px;
+  }
+
+  select, input, textarea {
+    font-size: 16px;
+    padding: 10px 12px;
+  }
+
+  .btn {
+    min-height: 44px;
+    padding: 11px 14px;
+    font-size: 15px;
+  }
+
+  .btn-group .btn {
+    flex: 1 1 calc(50% - 8px);
+  }
+
+  /* 画布保持最小可读宽度，装不下时横向滚动，而不是把方块压扁 */
+  .visual__canvas {
+    overflow-x: auto;
+    min-height: 300px;
+  }
+
+  #memory-svg {
+    min-width: 680px;
+  }
+
+  .log {
+    height: 150px;
+  }
+}
