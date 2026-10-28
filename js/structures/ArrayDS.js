@@ -8,6 +8,11 @@
  *   [0]   [1]   [2]  ...
  *  0x1000 0x1004 0x1008  （每槽 4 字节）
  * 插入 / 删除会引起元素在连续区间内整体移动。
+ *
+ * plan* 方法支持可选参数 len / mem：
+ *   len —— 该次规划应假设的“当前元素个数”（代码模式连续规划多行时使用）；
+ *   mem —— 读取元素值的数据源（代码模式用模拟内存，避免读到旧值）。
+ * 单次操作可省略，默认使用 this.length / this.memory。
  */
 import { STEP, makeStep } from '../core/Step.js';
 
@@ -29,18 +34,31 @@ export class ArrayDS {
     });
   }
 
-  /** 规划：在 index 位置插入 value。 */
-  planInsert(index, value) {
+  /** 规划：把 index 位置的值直接改写为 value（长度不变）。 */
+  planSet(index, value, len = this.length) {
     const steps = [];
-    if (index < 0 || index > this.length || this.length >= this.capacity) {
+    if (index < 0 || index >= len) return steps;
+    steps.push(
+      makeStep(STEP.SET_VALUE, { block: this.slots[index].id, value }, {
+        zh: `将下标 ${index} 的值修改为 ${value}`,
+        en: `Set index ${index} to ${value}`,
+      })
+    );
+    return steps;
+  }
+
+  /** 规划：在 index 位置插入 value。 */
+  planInsert(index, value, len = this.length, mem = this.memory) {
+    const steps = [];
+    if (index < 0 || index > len || len >= this.capacity) {
       return steps; // 非法：由 main 层先做校验
     }
 
-    // 从尾部开始，把 [index, length-1] 的元素逐个向后移一位
-    for (let i = this.length - 1; i >= index; i--) {
+    // 从尾部开始，把 [index, len-1] 的元素逐个向后移一位
+    for (let i = len - 1; i >= index; i--) {
       const from = this.slots[i].id;
       const to = this.slots[i + 1].id;
-      const moved = this.memory.read(from);
+      const moved = mem.read(from);
       steps.push(
         makeStep(STEP.MOVE_VALUE, { from, to }, {
           zh: `将元素 ${moved} 从下标 ${i} 后移到下标 ${i + 1}`,
@@ -64,15 +82,15 @@ export class ArrayDS {
   }
 
   /** 规划：删除 index 位置的元素。 */
-  planDelete(index) {
+  planDelete(index, len = this.length, mem = this.memory) {
     const steps = [];
-    if (index < 0 || index >= this.length) return steps;
+    if (index < 0 || index >= len) return steps;
 
-    // 把 [index+1, length-1] 的元素依次向前移动一位覆盖被删元素
-    for (let i = index; i < this.length - 1; i++) {
+    // 把 [index+1, len-1] 的元素依次向前移动一位覆盖被删元素
+    for (let i = index; i < len - 1; i++) {
       const from = this.slots[i + 1].id;
       const to = this.slots[i].id;
-      const moved = this.memory.read(from);
+      const moved = mem.read(from);
       steps.push(
         makeStep(STEP.MOVE_VALUE, { from, to }, {
           zh: `将元素 ${moved} 从下标 ${i + 1} 前移到下标 ${i}`,
@@ -83,9 +101,9 @@ export class ArrayDS {
 
     // 清空尾部多余槽位
     steps.push(
-      makeStep(STEP.CLEAR_VALUE, { block: this.slots[this.length - 1].id }, {
-        zh: `清除下标 ${this.length - 1}（元素已前移）`,
-        en: `Clear index ${this.length - 1}`,
+      makeStep(STEP.CLEAR_VALUE, { block: this.slots[len - 1].id }, {
+        zh: `清除下标 ${len - 1}（元素已前移）`,
+        en: `Clear index ${len - 1}`,
       })
     );
 
@@ -96,11 +114,11 @@ export class ArrayDS {
   }
 
   /** 规划：查找 value，返回逐个比较的步骤序列。 */
-  planSearch(value) {
+  planSearch(value, len = this.length, mem = this.memory) {
     const steps = [];
-    for (let i = 0; i < this.length; i++) {
+    for (let i = 0; i < len; i++) {
       const id = this.slots[i].id;
-      const cur = this.memory.read(id);
+      const cur = mem.read(id);
       steps.push(
         makeStep(STEP.COMPARE, { block: id }, {
           zh: `比较下标 ${i}：当前值 ${cur} 与目标 ${value}`,

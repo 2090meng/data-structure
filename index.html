@@ -34,9 +34,10 @@
         <ol class="help-list">
           <li><span class="zh">先在右上角选择语言。</span><span class="en">Pick a language at the top-right.</span></li>
           <li><span class="zh">在左侧选择数据结构（目前仅「数组 Array」可用）。</span><span class="en">Choose a data structure (only Array is available for now).</span></li>
-          <li><span class="zh">选择操作：插入(Insert)、删除(Delete)、查找(Search)。</span><span class="en">Pick an operation: insert, delete, or search.</span></li>
-          <li><span class="zh">填参数：插入/删除填「下标」，插入/查找填「值」。</span><span class="en">Fill parameters: index for insert/delete, value for insert/search.</span></li>
-          <li><span class="zh">先点「执行」生成动画步骤，再点「单步执行」逐帧看，或点「自动播放」连续播放。</span><span class="en">Click "Execute" to generate steps, then "Step" to advance one by one, or "Play" to auto-run.</span></li>
+          <li><span class="zh">选择操作：插入(Insert)、删除(Delete)、修改(Set)、查找(Search)。</span><span class="en">Pick an operation: insert, delete, set, or search.</span></li>
+          <li><span class="zh">填参数：插入/删除/修改填「下标」，插入/修改/查找填「值」。</span><span class="en">Fill parameters: index for insert/delete/set, value for insert/set/search.</span></li>
+          <li><span class="zh">点「执行」立即运行动画查看结果；代码模式点「运行代码」后，用「单步执行」逐行或「自动播放」连续播放。</span><span class="en">Click "Execute" to run the animation right away; in code mode, click "Run Code" then "Step" line by line or "Play" to auto-run.</span></li>
+          <li><span class="zh">也可在「代码驱动」区输入伪代码，点「运行代码」后逐行高亮执行，右侧内存同步变化。</span><span class="en">Or type pseudo-code in the code area and click "Run Code" — it highlights each line while the memory updates.</span></li>
           <li><span class="zh">观察右侧内存块的地址与值变化，配合下方日志理解每一步。</span><span class="en">Watch the memory block addresses/values on the right, with the log below.</span></li>
           <li><span class="zh">点「重置」清空并恢复初始状态。</span><span class="en">Click "Reset" to clear and restart.</span></li>
         </ol>
@@ -64,6 +65,7 @@
           <select id="op-select">
             <option value="insert">插入 Insert</option>
             <option value="delete">删除 Delete</option>
+            <option value="set">修改/赋值 Set</option>
             <option value="search">查找 Search</option>
           </select>
         </div>
@@ -86,8 +88,30 @@
       </section>
 
       <section class="panel__section">
-        <h2 class="panel__title zh">3. 播放控制</h2>
-        <h2 class="panel__title en">3. Playback</h2>
+        <h2 class="panel__title zh">3. 代码驱动（高级）</h2>
+        <h2 class="panel__title en">3. Code-driven (advanced)</h2>
+        <textarea id="code-input" class="code-input" spellcheck="false"></textarea>
+        <div id="code-view" class="code-view"></div>
+        <div class="code-hint zh">
+          每行一条指令（大小写不敏感，<code>//</code> 注释，<code>;</code> 分隔）：
+          <code>arr[0] = 5;</code> 修改下标；<code>insert(arr, 2, 5);</code> 插入；
+          <code>insert(arr, 5);</code> 末尾追加；<code>remove(arr, 0);</code> 删除；
+          <code>search(arr, 5);</code> 查找。
+        </div>
+        <div class="code-hint en">
+          One command per line (case-insensitive, <code>//</code> comments, <code>;</code> separator):
+          <code>arr[0] = 5;</code> set; <code>insert(arr, 2, 5);</code> insert;
+          <code>insert(arr, 5);</code> append; <code>remove(arr, 0);</code> delete;
+          <code>search(arr, 5);</code> search.
+        </div>
+        <button id="run-code-btn" class="btn btn--primary">
+          <span class="zh">运行代码</span><span class="en">Run Code</span>
+        </button>
+      </section>
+
+      <section class="panel__section">
+        <h2 class="panel__title zh">4. 播放控制</h2>
+        <h2 class="panel__title en">4. Playback</h2>
         <div class="btn-group">
           <button id="step-btn" class="btn">
             <span class="zh">单步执行</span><span class="en">Step</span>

@@ -15,14 +15,17 @@ export class Animator {
    * @param {import('../core/MemoryModel.js').MemoryModel} memory 内存模型
    * @param {import('../render/Renderer.js').Renderer} renderer 渲染器
    * @param {(text:{zh:string,en:string}|null)=>void} onLog 日志回调（接收原始双语文本）
+   * @param {(line:number|null)=>void} onLine 代码行回调（执行到带 line 的步骤时触发，用于高亮代码行）
    */
-  constructor(memory, renderer, onLog = () => {}) {
+  constructor(memory, renderer, onLog = () => {}, onLine = () => {}) {
     this.memory = memory;
     this.renderer = renderer;
     this.onLog = onLog;
+    this.onLine = onLine;
     this.queue = [];          // 待执行步骤队列
     this.playing = false;     // 是否处于自动播放中
     this.generation = 0;      // 用于中断重置：reset 后递增，使进行中的异步执行作废
+    this._currentLine = null; // 当前高亮的代码行号（1 起始）
     this.stepDelay = 520;     // 自动播放时步骤之间的停顿(ms)
     this.compareDelay = 500;  // 单次比较闪烁时长(ms)
   }
@@ -43,6 +46,10 @@ export class Animator {
     this.playing = false;
     this.queue = [];
     this.generation++;
+    if (this._currentLine !== null) {
+      this._currentLine = null;
+      this.onLine(null);
+    }
   }
 
   /** 自动播放：顺序执行全部步骤。 */
@@ -71,6 +78,12 @@ export class Animator {
 
   /** 执行单个步骤（含动画与日志）。 */
   async _execute(step, gen) {
+    // 代码行高亮：当步骤携带 line 且与当前不同时触发
+    if (typeof step.line === 'number' && step.line !== this._currentLine) {
+      this._currentLine = step.line;
+      this.onLine(step.line);
+    }
+
     // 输出日志
     if (step.text) this.onLog(step.text);
 

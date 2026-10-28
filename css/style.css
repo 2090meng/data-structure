@@ -96,7 +96,7 @@ html, body {
   color: var(--text-dim);
 }
 
-select, input {
+select, input, textarea {
   background: #0f172a;
   color: var(--text);
   border: 1px solid var(--border);
@@ -106,7 +106,7 @@ select, input {
   outline: none;
 }
 
-select:focus, input:focus {
+select:focus, input:focus, textarea:focus {
   border-color: var(--accent);
 }
 
@@ -338,6 +338,68 @@ select:focus, input:focus {
   font-size: 12px;
   line-height: 1.6;
   color: var(--text-dim);
+}
+
+/* 代码驱动区 / Code-driven area */
+.code-input {
+  width: 100%;
+  min-height: 110px;
+  resize: vertical;
+  font-family: "Consolas", "Courier New", monospace;
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.code-view {
+  margin: 8px 0 0;
+  background: #0f172a;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 6px 0;
+  max-height: 150px;
+  overflow-y: auto;
+  font-family: "Consolas", "Courier New", monospace;
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.code-line {
+  display: flex;
+  gap: 10px;
+  padding: 0 10px;
+  white-space: pre;
+}
+
+.code-line.active {
+  background: rgba(56, 189, 248, 0.18);
+  border-left: 3px solid var(--accent);
+}
+
+.code-line__num {
+  color: var(--text-dim);
+  user-select: none;
+  min-width: 20px;
+  text-align: right;
+  flex-shrink: 0;
+}
+
+.code-line__body {
+  color: var(--text);
+}
+
+.code-hint {
+  font-size: 11px;
+  color: var(--text-dim);
+  line-height: 1.8;
+  margin: 6px 0 0;
+}
+
+.code-hint code {
+  background: #0f172a;
+  padding: 1px 5px;
+  border-radius: 4px;
+  color: var(--accent);
+  font-family: "Consolas", "Courier New", monospace;
 }
 
 /* 中英双语切换 / Bilingual visibility */
