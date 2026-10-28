@@ -3,12 +3,17 @@
  *
  * 职责：绑定界面事件，把用户输入转成操作指令，
  * 串联「数据结构层 → 动画层 → 渲染层」三部分，并维护日志与语言状态。
+ *
+ * 当前支持三种结构：数组 Array / 栈 Stack / 队列 Queue。
+ * 切换结构会重建内存与结构对象，操作项（下拉框）随之动态变化。
  */
 import { i18n } from './i18n.js';
 import { MemoryModel } from './core/MemoryModel.js';
 import { Renderer } from './render/Renderer.js';
 import { Animator } from './animation/Animator.js';
 import { ArrayDS } from './structures/ArrayDS.js';
+import { StackDS } from './structures/StackDS.js';
+import { QueueDS } from './structures/QueueDS.js';
 import { CommandParser } from './core/CommandParser.js';
 import { Preprocessor } from './core/Preprocessor.js';
 
@@ -40,7 +45,8 @@ const speedSelect = document.getElementById('speed-select');
 // ---------- 3. 创建核心对象 ----------
 let memory = new MemoryModel();
 const renderer = new Renderer(svg);
-let array = new ArrayDS(memory, 8); // 默认数组，容量 8
+let structure = null;       // 当前数据结构对象（ArrayDS / StackDS / QueueDS）
+let structKind = 'array';   // 当前结构类型
 
 const animator = new Animator(
   memory,
@@ -53,6 +59,93 @@ const animator = new Animator(
 
 // 速度档位（毫秒）→ 与 HTML 中 speed-select 的 option value 对应
 const SPEED_MAP = { slow: 800, normal: 400, fast: 100, instant: 0 };
+
+// 各结构的默认容量
+const DEFAULT_CAPACITY = { array: 8, stack: 8, queue: 6 };
+
+// 各结构支持的操作项（value -> 中英标签）
+const OPS = {
+  array: [
+    ['insert', '插入 Insert'],
+    ['delete', '删除 Delete'],
+    ['set', '修改/赋值 Set'],
+    ['search', '查找 Search'],
+  ],
+  stack: [
+    ['push', '入栈 Push'],
+    ['pop', '出栈 Pop'],
+    ['peek', '取栈顶 Peek'],
+    ['search', '查找 Search'],
+  ],
+  queue: [
+    ['enqueue', '入队 Enqueue'],
+    ['dequeue', '出队 Dequeue'],
+    ['front', '查看队头 Front'],
+    ['search', '查找 Search'],
+  ],
+};
+
+// 各结构的示例代码
+const SAMPLES = {
+  array: `#include <stdio.h>
+
+int main() {
+    // 1. 初始化一个容量为 8 的数组，目前有 5 个有效元素
+    int arr[8] = {10, 20, 30, 40, 50};
+    int length = 5;
+    int capacity = 8;
+
+    // 操作 1：在下标 2 的位置插入元素 99
+    for (int i = length; i > 2; i--) {
+        arr[i] = arr[i - 1]; // 从后往前挪，腾出空间
+    }
+    arr[2] = 99;
+    length++; // 长度加 1
+
+    // 操作 2：删除下标 1 的元素（即 20）
+    for (int i = 1; i < length - 1; i++) {
+        arr[i] = arr[i + 1]; // 从前往后挪，覆盖被删除的元素
+    }
+    length--; // 长度减 1
+
+    // 打印最终结果（打印语句会被忽略）
+    printf("最终数组内容: ");
+    for (int i = 0; i < length; i++) {
+        printf("%d ", arr[i]);
+    }
+    printf("\\n");
+
+    return 0;
+}`,
+  stack: `#include <stdio.h>
+
+int main() {
+    // 顺序栈：容量 8，只在栈顶操作，后进先出 LIFO
+    int st[8] = {10, 20, 30};
+
+    push(st, 40);   // 入栈 40，栈顶变为 40
+    push(st, 50);   // 再入栈 50，栈顶变为 50
+    pop(st);        // 弹出栈顶 50
+    push(st, 60);   // 再入栈 60
+
+    printf("演示结束（打印语句会被忽略）\\n");
+    return 0;
+}`,
+  queue: `#include <stdio.h>
+
+int main() {
+    // 循环队列：容量 6，队尾入队、队头出队，先进先出 FIFO
+    int q[6] = {10, 20, 30};
+
+    enqueue(q, 40);  // 入队 40
+    dequeue(q);      // 出队 10，front 后移
+    enqueue(q, 50);  // 入队 50
+    enqueue(q, 60);  // 入队 60，槽位绕回环形空位
+
+    printf("演示结束（打印语句会被忽略）\\n");
+    return 0;
+}`,
+};
 
 // ---------- 4. 工具函数 ----------
 /** 向日志区追加一条步骤说明（自动按当前语言翻译）。isError 为真时红色高亮。 */
@@ -93,7 +186,10 @@ function handleError(e) {
 /** 根据当前选择的操作类型，显示/隐藏对应输入项。 */
 function syncFields() {
   const op = opSelect.value;
-  indexField.style.display = op === 'search' ? 'none' : 'flex';
+  const needIndex = op === 'insert' || op === 'delete' || op === 'set';
+  const needValue = op === 'insert' || op === 'set' || op === 'search' || op === 'push' || op === 'enqueue';
+  indexField.style.display = needIndex ? 'flex' : 'none';
+  valueField.style.display = needValue ? 'flex' : 'none';
 }
 
 /** 解析整数输入（仅接受整数；空、非数字、小数一律返回 null）。 */
@@ -105,14 +201,52 @@ function parseIntValue(input) {
   return n;
 }
 
-// ---------- 5. 重置 ----------
-function resetAll(capacity = 8) {
-  animator.reset();                     // 中断播放、清空队列
-  memory = new MemoryModel();           // 重建内存
-  array = new ArrayDS(memory, capacity); // 重建数组结构（容量可被代码声明覆盖）
-  animator.memory = memory;             // 让动画引擎指向新内存
-  renderer.render(memory);              // 重绘
+// ---------- 5. 结构构建 / 重置 ----------
+function createStructure(kind, mem, capacity) {
+  if (kind === 'stack') return new StackDS(mem, capacity);
+  if (kind === 'queue') return new QueueDS(mem, capacity);
+  return new ArrayDS(mem, capacity);
+}
+
+/** 重建内存与结构对象（不清理日志）。 */
+function rebuild(kind, capacity) {
+  structKind = kind;
+  animator.reset();                      // 中断播放、清空队列
+  memory = new MemoryModel();            // 重建内存
+  structure = createStructure(kind, memory, capacity || DEFAULT_CAPACITY[kind] || 8);
+  animator.memory = memory;              // 让动画引擎指向新内存
+  renderer.setViewProvider(() => structure.view()); // 渲染层按结构决定布局与指针
+  renderer.render(memory);
+}
+
+/** 重置为当前结构的初始状态（容量可被代码声明覆盖）。 */
+function resetAll(capacity) {
+  rebuild(structKind, capacity);
   clearLog();
+  setActiveLine(null);
+}
+
+/** 按当前结构重建操作下拉框。 */
+function syncOps() {
+  const ops = OPS[structKind] || OPS.array;
+  opSelect.innerHTML = '';
+  for (const [value, label] of ops) {
+    const opt = document.createElement('option');
+    opt.value = value;
+    opt.textContent = label;
+    opSelect.appendChild(opt);
+  }
+  syncFields();
+}
+
+/** 切换数据结构：重建结构、刷新操作项与示例代码。 */
+function switchStructure(kind) {
+  rebuild(kind);
+  syncOps();
+  codeInput.value = SAMPLES[kind] || '';
+  syncCodeView();
+  clearLog();
+  setActiveLine(null);
 }
 
 // ---------- 6. 执行操作 ----------
@@ -124,35 +258,72 @@ function execute() {
   for (const b of memory.blocks.values()) b.hit = false;
 
   const op = opSelect.value;
+  const index = parseIntValue(indexInput);
+  const value = parseIntValue(valueInput);
   let steps = [];
 
-  if (op === 'insert') {
-    const index = parseIntValue(indexInput);
-    const value = parseIntValue(valueInput);
-    if (index === null || value === null) return addLog({ zh: '请输入合法的下标和值', en: 'Invalid index or value' });
-    if (index < 0 || index > array.length || array.length >= array.capacity) {
-      return addLog({ zh: `下标须在 0~${array.length} 之间且数组未满`, en: `Index must be in 0~${array.length} and array not full` });
+  if (structKind === 'array') {
+    if (op === 'insert') {
+      if (index === null || value === null) return addLog({ zh: '请输入合法的下标和值', en: 'Invalid index or value' });
+      if (index < 0 || index > structure.length || structure.length >= structure.capacity) {
+        return addLog({ zh: `下标须在 0~${structure.length} 之间且数组未满`, en: `Index must be in 0~${structure.length} and array not full` });
+      }
+      steps = structure.planInsert(index, value);
+    } else if (op === 'delete') {
+      if (index === null) return addLog({ zh: '请输入合法的下标', en: 'Invalid index' });
+      if (index < 0 || index >= structure.length) {
+        return addLog({ zh: `下标须在 0~${structure.length - 1} 之间`, en: `Index must be in 0~${structure.length - 1}` });
+      }
+      steps = structure.planDelete(index);
+    } else if (op === 'set') {
+      if (index === null || value === null) return addLog({ zh: '请输入合法的下标和值', en: 'Invalid index or value' });
+      if (index < 0 || index >= structure.length) {
+        return addLog({ zh: `下标须在 0~${structure.length - 1} 之间`, en: `Index must be in 0~${structure.length - 1}` });
+      }
+      steps = structure.planSet(index, value);
+    } else if (op === 'search') {
+      if (value === null) return addLog({ zh: '请输入合法的查找值', en: 'Invalid value' });
+      if (structure.length === 0) return addLog({ zh: '数组为空，无法查找', en: 'The array is empty' });
+      steps = structure.planSearch(value);
     }
-    steps = array.planInsert(index, value);
-  } else if (op === 'delete') {
-    const index = parseIntValue(indexInput);
-    if (index === null) return addLog({ zh: '请输入合法的下标', en: 'Invalid index' });
-    if (index < 0 || index >= array.length) {
-      return addLog({ zh: `下标须在 0~${array.length - 1} 之间`, en: `Index must be in 0~${array.length - 1}` });
+  } else if (structKind === 'stack') {
+    if (op === 'push') {
+      if (value === null) return addLog({ zh: '请输入合法的入栈值', en: 'Invalid value' });
+      const err = structure.pushError();
+      if (err) return addLog(err, true);
+      steps = structure.planPush(value);
+    } else if (op === 'pop') {
+      const err = structure.popError();
+      if (err) return addLog(err, true);
+      steps = structure.planPop();
+    } else if (op === 'peek') {
+      const err = structure.peekError();
+      if (err) return addLog(err, true);
+      steps = structure.planPeek();
+    } else if (op === 'search') {
+      if (value === null) return addLog({ zh: '请输入合法的查找值', en: 'Invalid value' });
+      if (structure.length === 0) return addLog({ zh: '栈为空，无法查找', en: 'The stack is empty' });
+      steps = structure.planSearch(value);
     }
-    steps = array.planDelete(index);
-  } else if (op === 'set') {
-    const index = parseIntValue(indexInput);
-    const value = parseIntValue(valueInput);
-    if (index === null || value === null) return addLog({ zh: '请输入合法的下标和值', en: 'Invalid index or value' });
-    if (index < 0 || index >= array.length) {
-      return addLog({ zh: `下标须在 0~${array.length - 1} 之间`, en: `Index must be in 0~${array.length - 1}` });
+  } else if (structKind === 'queue') {
+    if (op === 'enqueue') {
+      if (value === null) return addLog({ zh: '请输入合法的入队值', en: 'Invalid value' });
+      const err = structure.enqueueError();
+      if (err) return addLog(err, true);
+      steps = structure.planEnqueue(value);
+    } else if (op === 'dequeue') {
+      const err = structure.dequeueError();
+      if (err) return addLog(err, true);
+      steps = structure.planDequeue();
+    } else if (op === 'front') {
+      const err = structure.frontError();
+      if (err) return addLog(err, true);
+      steps = structure.planFront();
+    } else if (op === 'search') {
+      if (value === null) return addLog({ zh: '请输入合法的查找值', en: 'Invalid value' });
+      if (structure.length === 0) return addLog({ zh: '队列为空，无法查找', en: 'The queue is empty' });
+      steps = structure.planSearch(value);
     }
-    steps = array.planSet(index, value);
-  } else if (op === 'search') {
-    const value = parseIntValue(valueInput);
-    if (value === null) return addLog({ zh: '请输入合法的查找值', en: 'Invalid value' });
-    steps = array.planSearch(value);
   }
 
   if (!steps.length) return;
@@ -166,7 +337,7 @@ function execute() {
   }
 }
 
-// ---------- 6.5 代码驱动模式 ----------
+// ---------- 7. 代码驱动模式 ----------
 
 /** 把代码文本框内容镜像成带行号的代码视图（供执行时高亮）。 */
 function syncCodeView() {
@@ -200,7 +371,7 @@ function setActiveLine(line) {
   }
 }
 
-/** 解析并装载代码，生成动画步骤（每次从初始数组状态开始运行）。 */
+/** 解析并装载代码，生成动画步骤（每次从初始结构状态开始运行）。 */
 function runCode() {
   try {
   syncCodeView();
@@ -210,12 +381,13 @@ function runCode() {
 
   const { commands, declaration, truncated } = CommandParser.parse(cleaned.output);
 
-  // 声明决定容量（默认 8，且不小于初始化元素个数）
-  const capacity = declaration ? Math.max(declaration.capacity, declaration.values.length, 1) : 8;
+  // 声明决定容量（取结构默认容量，且不小于初始化元素个数）
+  const baseCap = DEFAULT_CAPACITY[structKind] || 8;
+  const capacity = declaration ? Math.max(declaration.capacity, declaration.values.length, 1) : baseCap;
   resetAll(capacity);
-  // 代码模式从“声明初始化”开始：让数组内部长度与初始化真实写入的元素一致，
-  // 后续插入/删除的 length++/-- 才能累积出正确结果，避免切回手动模式时长度错乱。
-  if (declaration) array.length = declaration.values.length;
+  // 代码模式从“声明初始化”开始：让结构内部元素个数与初始化真实写入的数量一致，
+  // 后续插入/删除/入栈出队的 length++/-- 才能累积出正确结果。
+  if (declaration) structure.setInitialLength(declaration.values.length);
 
   if (cleaned.ignoredCount > 0) {
     addLog({ zh: `已忽略 ${cleaned.ignoredCount} 条无关语句`, en: `Ignored ${cleaned.ignoredCount} irrelevant statement(s)` });
@@ -224,7 +396,7 @@ function runCode() {
     addLog({ zh: `指令过多，仅提取前 ${CommandParser.MAX_COMMANDS} 条`, en: `Too many commands, only the first ${CommandParser.MAX_COMMANDS} were used` }, true);
   }
 
-  const { steps, errors } = CommandParser.buildSteps(array, commands, declaration);
+  const { steps, errors } = CommandParser.buildSteps(structure, commands, declaration);
   for (const e of errors) addLog(e.msg, true);
   if (!steps.length) {
     if (!errors.length) addLog({ zh: '没有可执行的指令', en: 'No executable commands' });
@@ -261,7 +433,7 @@ function extractCode() {
   }
 }
 
-// ---------- 7. 事件绑定 ----------
+// ---------- 8. 事件绑定 ----------
 executeBtn.addEventListener('click', execute);
 stepBackBtn.addEventListener('click', () => animator.stepBack());
 stepBtn.addEventListener('click', () => animator.stepOnce());
@@ -271,42 +443,14 @@ runCodeBtn.addEventListener('click', runCode);
 extractBtn.addEventListener('click', extractCode);
 codeInput.addEventListener('input', syncCodeView);
 opSelect.addEventListener('change', syncFields);
+structureSelect.addEventListener('change', () => switchStructure(structureSelect.value));
 langSelect.addEventListener('change', () => i18n.setLang(langSelect.value));
 speedSelect.addEventListener('change', () => animator.setSpeed(SPEED_MAP[speedSelect.value]));
 
-// ---------- 8. 初始渲染 ----------
-// 预填一段 C 风格示例代码：演示数组初始化 + 下标插入（右移）+ 下标删除（左移）
-codeInput.value = `#include <stdio.h>
-
-int main() {
-    // 1. 初始化一个容量为 8 的数组，目前有 5 个有效元素
-    int arr[8] = {10, 20, 30, 40, 50};
-    int length = 5;
-    int capacity = 8;
-
-    // 操作 1：在下标 2 的位置插入元素 99
-    for (int i = length; i > 2; i--) {
-        arr[i] = arr[i - 1]; // 从后往前挪，腾出空间
-    }
-    arr[2] = 99;
-    length++; // 长度加 1
-
-    // 操作 2：删除下标 1 的元素（即 20）
-    for (int i = 1; i < length - 1; i++) {
-        arr[i] = arr[i + 1]; // 从前往后挪，覆盖被删除的元素
-    }
-    length--; // 长度减 1
-
-    // 打印最终结果（打印语句会被忽略）
-    printf("最终数组内容: ");
-    for (int i = 0; i < length; i++) {
-        printf("%d ", arr[i]);
-    }
-    printf("\\n");
-
-    return 0;
-}`;
-syncFields();
+// ---------- 9. 初始渲染 ----------
+rebuild(structKind);                     // 默认数组，容量 8
+syncOps();
+codeInput.value = SAMPLES.array;         // 预填 C 风格示例代码
 syncCodeView();
 animator.setSpeed(SPEED_MAP[speedSelect.value]);
 renderer.render(memory);

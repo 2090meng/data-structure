@@ -149,6 +149,18 @@ Preprocessor._PATTERNS = [
     re: new RegExp('^pop\\s*\\(\\s*' + IDENT + '\\s*\\)$', 'i'),
     fmt: () => `pop(arr);`,
   },
+  // enqueue(q, v)
+  {
+    exact: true,
+    re: new RegExp('^enqueue\\s*\\(\\s*' + IDENT + '\\s*,\\s*(-?\\d+)\\s*\\)$', 'i'),
+    fmt: (m) => `enqueue(q, ${m[1]});`,
+  },
+  // dequeue(q)
+  {
+    exact: true,
+    re: new RegExp('^dequeue\\s*\\(\\s*' + IDENT + '\\s*\\)$', 'i'),
+    fmt: () => `dequeue(q);`,
+  },
   // arr[i] = v
   {
     exact: true,

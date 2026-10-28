@@ -22,6 +22,7 @@ export class ArrayDS {
    * @param {number} capacity 数组容量（预分配的连续槽位数）
    */
   constructor(memory, capacity = 8) {
+    this.kind = 'array';
     this.memory = memory;
     this.capacity = capacity;
     // 一次性连续分配 capacity 个槽位，地址连续
@@ -32,6 +33,16 @@ export class ArrayDS {
     this.slots.forEach((b, i) => {
       b.meta.label = '[' + i + ']';
     });
+  }
+
+  /** 代码模式声明初始化后，同步元素个数。 */
+  setInitialLength(n) {
+    this.length = Math.max(0, Math.min(n, this.capacity));
+  }
+
+  /** 渲染视图描述：默认网格布局，无额外指针。 */
+  view() {
+    return { layout: 'grid', title: 'Memory / 内存', pointers: [] };
   }
 
   /** 规划：把 index 位置的值直接改写为 value（长度不变）。 */

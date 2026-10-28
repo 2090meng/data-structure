@@ -191,6 +191,7 @@ select:focus, input:focus, textarea:focus {
 .swatch--alloc { background: var(--alloc); }
 .swatch--free  { background: var(--free); }
 .swatch--hl    { background: var(--highlight); }
+.swatch--ptr   { background: var(--accent); }
 
 /* 右侧可视化 + 日志 / Visual + Log */
 .visual {
@@ -308,6 +309,14 @@ select:focus, input:focus, textarea:focus {
 .mem-empty {
   font-size: 12px;
   fill: rgba(15, 23, 42, 0.5);
+}
+
+/* 结构指针标注（栈顶 top / 队头 front / 队尾 rear） */
+.mem-ptr {
+  font-size: 13px;
+  font-weight: 700;
+  fill: var(--accent);
+  font-family: "Consolas", "Courier New", monospace;
 }
 
 /* 值飞行动画的漂浮文本 */

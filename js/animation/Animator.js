@@ -268,9 +268,11 @@ export class Animator {
         break;
       }
 
-      // 结构元数据更新（如数组 length++/--），在动画执行到该步时生效。
+      // 结构元数据更新（如数组 length、栈顶 top、队列 front），在动画执行到该步时生效。
+      // 这些元数据会影响布局与指针标注（如栈的 top、队列的 front），因此需要重绘。
       case STEP.META: {
         if (typeof step.payload.run === 'function') step.payload.run();
+        this.renderer.render(this.memory);
         break;
       }
 
