@@ -33,11 +33,12 @@
         </summary>
         <ol class="help-list">
           <li><span class="zh">先在右上角选择语言。</span><span class="en">Pick a language at the top-right.</span></li>
-          <li><span class="zh">在左侧选择数据结构：数组 Array、链表 Linked List、栈 Stack、队列 Queue（切换结构会重置内存并载入对应示例代码）。</span><span class="en">Choose a data structure: Array, Linked List, Stack or Queue (switching rebuilds the memory and loads a matching sample).</span></li>
-          <li><span class="zh">选择操作：数组为插入/删除/修改/查找；链表为插入/删除/查找；栈为入栈/出栈/取栈顶/查找；队列为入队/出队/查看队头/查找。</span><span class="en">Pick an operation: array = insert/delete/set/search; linked list = insert/delete/search; stack = push/pop/peek/search; queue = enqueue/dequeue/front/search.</span></li>
-          <li><span class="zh">填参数：插入/删除/修改填「位序」（按考研教材从 1 开始；插入可取 1..length+1，删除/修改可取 1..length），插入/修改/查找/入栈/入队填「值」（栈和队列不需要填位序）。</span><span class="en">Fill parameters: position for insert/delete/set (1-based per textbook; insert allows 1..length+1, delete/set allows 1..length), value for insert/set/search/push/enqueue (stack and queue need no position).</span></li>
+          <li><span class="zh">在左侧选择数据结构：数组 Array、链表 Linked List、栈 Stack、队列 Queue、二叉树 Binary Tree（切换结构会重置内存并载入对应示例代码）。</span><span class="en">Choose a data structure: Array, Linked List, Stack, Queue or Binary Tree (switching rebuilds the memory and loads a matching sample).</span></li>
+          <li><span class="zh">选择操作：数组为插入/删除/修改/查找；链表为插入/删除/查找；栈为入栈/出栈/取栈顶/查找；队列为入队/出队/查看队头/查找；二叉树为插入左/右孩子、删除子树、查找、先序/中序/后序/层次遍历。</span><span class="en">Pick an operation: array = insert/delete/set/search; linked list = insert/delete/search; stack = push/pop/peek/search; queue = enqueue/dequeue/front/search; binary tree = insert left/right child, delete subtree, search, preorder/inorder/postorder/level-order traversal.</span></li>
+          <li><span class="zh">填参数：插入/删除/修改填「位序」（按考研教材从 1 开始；插入可取 1..length+1，删除/修改可取 1..length），插入/修改/查找/入栈/入队填「值」（栈和队列不需要填位序）；二叉树的插入左/右孩子填「父结点位序」与「值」，删除填「子树根结点位序」，遍历无需输入。</span><span class="en">Fill parameters: position for insert/delete/set (1-based per textbook; insert allows 1..length+1, delete/set allows 1..length), value for insert/set/search/push/enqueue (stack and queue need no position); for the binary tree, insert left/right takes the parent index and value, delete takes the subtree root index, traversal needs no input.</span></li>
           <li><span class="zh">指针语义按教材：栈的 <code>top</code> 指向栈顶元素的下一个空位（入栈先写入 <code>S.data[S.top]</code>，再 <code>S.top++</code>；出栈先 <code>S.top--</code>，再取数据）；队列为循环队列且牺牲一个单元（<code>rear</code> 指向队尾的下一个空位，<code>front==rear</code> 为空，<code>(rear+1)%MaxSize==front</code> 为满，最多存 MaxSize-1 个）。</span><span class="en">Pointer conventions follow the textbook: stack <code>top</code> points to the next free slot (push writes <code>S.data[S.top]</code> then <code>S.top++</code>; pop does <code>S.top--</code> then reads); queue is a circular queue sacrificing one slot (<code>rear</code> points to the slot after the last element, empty when <code>front==rear</code>, full when <code>(rear+1)%MaxSize==front</code>, storing at most MaxSize-1).</span></li>
           <li><span class="zh">链表为【带头结点】的单链表：<code>head</code> 指向头结点，块内左栏是 <code>data</code>、右栏是 <code>next</code>（后继结点地址或 NULL），块间箭头就是 next 指针；每个结点单独分配，所以地址不连续。插入先 <code>s-&gt;next = p-&gt;next</code> 再 <code>p-&gt;next = s</code>；删除时 <code>p-&gt;next = q-&gt;next</code> 后结点被摘链，内存不回收，灰显在行尾。</span><span class="en">The linked list has a head node: <code>head</code> points to it, each block shows <code>data</code> and <code>next</code> (address of the successor or NULL), and arrows are the next pointers; nodes are allocated separately, so addresses are non-contiguous. Insert does <code>s-&gt;next = p-&gt;next</code> then <code>p-&gt;next = s</code>; delete does <code>p-&gt;next = q-&gt;next</code>, the node is unlinked but its memory is kept (shown greyed at the end).</span></li>
+          <li><span class="zh">二叉树为【二叉链表】：每个结点单独分配（地址不连续），块间的箭头表示 <code>lchild / rchild</code> 指针。结点按【层序编号】定位：根为第 1 号，第 i 号的左孩子为 2i、右孩子为 2i+1。空树时“插入左/右孩子”会建立根结点；删除会移除以该结点为根的整棵子树（内存不回收，灰显在下方）。查找按先序逐个比较，遍历按先序/中序/后序/层次输出访问序列。</span><span class="en">The binary tree uses a linked representation: every node is allocated separately (non-contiguous addresses), and the arrows are <code>lchild / rchild</code> pointers. Nodes are addressed by level-order numbering: root = 1, left child of node i = 2i, right child = 2i+1. When the tree is empty, Insert Left/Right creates the root; Delete removes the whole subtree rooted at that node (memory is kept and greyed below). Search compares nodes in preorder; traversals output the preorder/inorder/postorder/level-order sequence.</span></li>
           <li><span class="zh">点「执行」立即运行动画查看结果；代码模式点「运行代码」后，用「单步执行」逐行或「自动播放」连续播放。</span><span class="en">Click "Execute" to run the animation right away; in code mode, click "Run Code" then "Step" line by line or "Play" to auto-run.</span></li>
           <li><span class="zh">也可在「代码驱动」区输入伪代码，点「运行代码」后逐行高亮执行，右侧内存同步变化。</span><span class="en">Or type pseudo-code in the code area and click "Run Code" — it highlights each line while the memory updates.</span></li>
           <li><span class="zh">若粘贴的是完整 C 代码，先点「提取指令」：它会自动过滤 #include、printf、for/while/if 等无关代码，只保留初始化、赋值、插入、删除、交换、查找、入栈出栈、入队出队等可演示操作，并把清洗后的指令回填到输入框；再点「运行代码」即可演示。</span><span class="en">If you paste full C code, click "Extract" first: it strips #include, printf, for/while/if and other irrelevant code, keeps only demonstrable operations (init, assignment, insert, remove, swap, search, push/pop, enqueue/dequeue), and writes the cleaned commands back into the box; then click "Run Code" to play.</span></li>
@@ -54,7 +55,7 @@
           <option value="linked">链表 Linked List</option>
           <option value="stack">栈 Stack</option>
           <option value="queue">队列 Queue</option>
-          <option value="binarytree" disabled>二叉树 Binary Tree (开发中)</option>
+          <option value="binarytree">二叉树 Binary Tree</option>
         </select>
       </section>
 
@@ -103,6 +104,7 @@
           <code>enqueue(q, 7);</code> 入队；<code>dequeue(q);</code> 出队；
           <code>remove(arr, 1);</code> 删除第 1 个（位序）；<code>search(arr, 5);</code> 查找；
           链表同样用位序：<code>insert(L, 1, 5);</code> 插到头结点之后，<code>remove(L, 2);</code> 删除第 2 个结点；
+          二叉树按层序编号：<code>int T[15] = {10, 20, 30};</code> 按层序建树，<code>insertLeft(T, 2, 5);</code> 给第 2 号结点挂左孩子，<code>insertRight(T, 2, 6);</code> 挂右孩子，<code>remove(T, 2);</code> 删除子树，<code>preorder(T); / inorder(T); / postorder(T); / levelorder(T);</code> 四种遍历；
           简写可省略变量名：<code>set(2, 99);</code>（物理下标）、<code>insert(2, 99);</code>（位序）、<code>remove(1);</code>（位序）、<code>swap(1, 3);</code>（物理下标）。
         </div>
         <div class="code-hint en">
@@ -113,6 +115,7 @@
           <code>enqueue(q, 7);</code> enqueue; <code>dequeue(q);</code> dequeue;
           <code>remove(arr, 1);</code> delete element 1 (1-based); <code>search(arr, 5);</code> search;
           linked list also uses 1-based positions: <code>insert(L, 1, 5);</code> inserts after the head node, <code>remove(L, 2);</code> deletes node 2;
+          binary tree uses level-order numbering: <code>int T[15] = {10, 20, 30};</code> builds by level order, <code>insertLeft(T, 2, 5);</code> attaches a left child to node 2, <code>insertRight(T, 2, 6);</code> a right child, <code>remove(T, 2);</code> deletes the subtree, <code>preorder(T); / inorder(T); / postorder(T); / levelorder(T);</code> four traversals;
           shorthand (variable omitted): <code>set(2, 99);</code> (physical index), <code>insert(2, 99);</code> (position), <code>remove(1);</code> (position), <code>swap(1, 3);</code> (physical index).
         </div>
         <div class="btn-group">
@@ -161,7 +164,8 @@
           <li><span class="swatch swatch--alloc"></span><span class="zh">已分配内存（存储元素）</span><span class="en">Allocated memory</span></li>
           <li><span class="swatch swatch--free"></span><span class="zh">空闲内存</span><span class="en">Free memory</span></li>
           <li><span class="swatch swatch--hl"></span><span class="zh">当前操作位置</span><span class="en">Current operation</span></li>
-          <li><span class="swatch swatch--ptr"></span><span class="zh">结构指针（top / front / rear / head / next 箭头）</span><span class="en">Structure pointer (top / front / rear / head / next arrow)</span></li>
+          <li><span class="swatch swatch--freed"></span><span class="zh">已删除（内存未回收）</span><span class="en">Deleted (memory kept)</span></li>
+          <li><span class="swatch swatch--ptr"></span><span class="zh">结构指针（top / front / rear / head / next / lchild / rchild 箭头）</span><span class="en">Structure pointer (top / front / rear / head / next / lchild / rchild arrow)</span></li>
         </ul>
       </section>
     </aside>

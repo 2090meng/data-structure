@@ -191,6 +191,10 @@ select:focus, input:focus, textarea:focus {
 .swatch--alloc { background: var(--alloc); }
 .swatch--free  { background: var(--free); }
 .swatch--hl    { background: var(--highlight); }
+.swatch--freed {
+  background: rgba(100, 116, 139, 0.35);
+  border: 1px dashed #64748b;
+}
 .swatch--ptr   { background: var(--accent); }
 
 /* 右侧可视化 + 日志 / Visual + Log */

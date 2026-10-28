@@ -24,6 +24,8 @@ const LAYOUT_QUEUE = { blockW: 96, blockH: 64, gapX: 18, gapY: 80, padX: 40, pad
 const LAYOUT_COLUMN = { blockW: 130, blockH: 52, gapX: 20, gapY: 34, padX: 150, padY: 74 };
 // 链表：块内左 data 右 next（指针区占 38%），块间距留出箭头空间
 const LAYOUT_LINKED = { blockW: 132, blockH: 64, gapX: 78, gapY: 0, padX: 84, padY: 96 };
+// 二叉树：按层排布（深度决定 y，中序次序决定 x），父子之间画带箭头的指针线
+const LAYOUT_TREE = { blockW: 84, blockH: 56, gapX: 36, gapY: 64, padX: 88, padY: 100 };
 
 export class Renderer {
   constructor(svgElement) {
@@ -74,6 +76,11 @@ export class Renderer {
     // 链表使用独立的单行横排布局（块内 data | next + 箭头连线），单独走一条绘制路径
     if (view && view.layout === 'linked') {
       this._renderLinked(memory, view);
+      return;
+    }
+    // 二叉树：按深度 / 中序次序排布，父子之间画指针线
+    if (view && view.layout === 'tree') {
+      this._renderTree(memory, view);
       return;
     }
     // 从链表切回其它结构时，恢复 CSS 的 width:100%
@@ -255,6 +262,177 @@ export class Renderer {
     const contentW = cfg.padX * 2 + nodes.length * (w + cfg.gapX);
     this.svg.style.width = Math.max(contentW, 640) + 'px';
     this.svg.style.height = Math.max(360, cfg.padY + h + 120) + 'px';
+  }
+
+  /**
+   * 二叉树专属绘制：
+   *   按【深度】决定 y（根在最上方），按【中序次序】决定 x（左右子树分居父结点两侧）；
+   *   父子之间用带箭头的线段表示 lchild / rchild 指针；
+   *   已删除或尚未挂链的块灰显在画面下方，且不参与连线。
+   */
+  _renderTree(memory, view) {
+    const cfg = LAYOUT_TREE;
+    this.blockW = cfg.blockW;
+    this.blockH = cfg.blockH;
+    this.gapX = cfg.gapX;
+    this.gapY = cfg.gapY;
+    this.padX = cfg.padX;
+    this.padY = cfg.padY;
+
+    const w = cfg.blockW;
+    const h = cfg.blockH;
+    const nodes = Array.isArray(view.nodes) ? view.nodes : [];
+    const byId = new Map(nodes.map((n) => [n.blockId, n]));
+
+    // 顶部标题
+    const title = this._el('text', { x: 40, y: 34, class: 'mem-label' });
+    title.textContent = view.title || 'Binary Tree / 二叉树';
+    this.svg.appendChild(title);
+
+    // 箭头定义（每次重绘重建，避免引用已被移除的旧节点）
+    const defs = this._el('defs', {});
+    const marker = this._el('marker', {
+      id: 'tree-arrow', viewBox: '0 0 10 10', refX: '9', refY: '5',
+      markerWidth: '7', markerHeight: '7', orient: 'auto',
+    });
+    marker.appendChild(this._el('path', { d: 'M 0 0 L 10 5 L 0 10 z', fill: '#38bdf8' }));
+    defs.appendChild(marker);
+    this.svg.appendChild(defs);
+
+    // 中序次序分配 x 槽位，深度分配 y
+    const slots = new Map();
+    const depths = new Map();
+    let slot = 0;
+    let maxDepth = 0;
+    const assign = (id, depth) => {
+      const n = byId.get(id);
+      if (!n) return;
+      depths.set(id, depth);
+      if (depth > maxDepth) maxDepth = depth;
+      if (n.leftId) assign(n.leftId, depth + 1);
+      slots.set(id, slot++);
+      if (n.rightId) assign(n.rightId, depth + 1);
+    };
+    if (view.rootId) assign(view.rootId, 0);
+
+    const posOf = (id) => {
+      const n = byId.get(id);
+      if (!n || !depths.has(id)) return null;
+      return {
+        x: cfg.padX + slots.get(id) * (w + cfg.gapX),
+        y: cfg.padY + depths.get(id) * (h + cfg.gapY),
+      };
+    };
+
+    // 先画父子指针线（画在块下方，避免压住块）
+    nodes.forEach((n) => {
+      const s = posOf(n.blockId);
+      if (!s) return;
+      for (const childId of [n.leftId, n.rightId]) {
+        const t = childId ? posOf(childId) : null;
+        if (!t) continue;
+        this.svg.appendChild(this._el('line', {
+          x1: s.x + w / 2, y1: s.y + h,
+          x2: t.x + w / 2, y2: t.y - 4,
+          class: 'mem-link', 'marker-end': 'url(#tree-arrow)',
+        }));
+      }
+    });
+
+    // 画树中结点
+    nodes.forEach((n) => {
+      const p = posOf(n.blockId);
+      if (!p) return;
+      const block = memory.getBlock(n.blockId);
+      const cx = p.x + w / 2;
+      const cy = p.y + h / 2;
+
+      let cls = 'mem-block mem-block--alloc';
+      if (block && block.highlight) cls += ' highlight';
+      if (block && block.hit) cls += ' hit';
+      this.svg.appendChild(this._el('rect', { x: p.x, y: p.y, width: w, height: h, rx: 8, class: cls }));
+
+      const addr = this._el('text', { x: cx, y: p.y - 10, class: 'mem-addr', 'text-anchor': 'middle' });
+      addr.textContent = block ? MemoryModel.formatAddress(block.address) : '';
+      this.svg.appendChild(addr);
+
+      const val = this._el('text', {
+        x: cx, y: cy,
+        class: block && block.value === null ? 'mem-empty' : 'mem-value',
+        'text-anchor': 'middle', 'dominant-baseline': 'central',
+      });
+      val.textContent = block && block.value !== null ? String(block.value) : '∅';
+      this.svg.appendChild(val);
+
+      const lbl = this._el('text', { x: cx, y: p.y + h + 16, class: 'mem-label', 'text-anchor': 'middle' });
+      lbl.textContent = n.label || '';
+      this.svg.appendChild(lbl);
+
+      this.positions[n.blockId] = { cx, cy, x: p.x, y: p.y, w, h };
+    });
+
+    // 根指针标注：画在根结点左侧
+    if (Array.isArray(view.pointers)) {
+      for (const ptr of view.pointers) {
+        const pos = this.positions[ptr.blockId];
+        if (!pos) continue;
+        const txt = this._el('text', {
+          x: pos.x - 16, y: pos.cy, class: 'mem-ptr',
+          'text-anchor': 'end', 'dominant-baseline': 'central',
+        });
+        txt.textContent = ptr.label + ' →';
+        this.svg.appendChild(txt);
+      }
+    }
+
+    // 画面下方：已删除 / 尚未挂链的块（灰显，不画指针线）
+    const freed = Array.isArray(view.freed) ? view.freed : [];
+    const freeY = cfg.padY + (maxDepth + 1) * (h + cfg.gapY) + 56;
+    let maxWidth = cfg.padX * 2 + Math.max(1, slots.size) * (w + cfg.gapX);
+    freed.forEach((f, i) => {
+      const x = cfg.padX + i * (w + cfg.gapX);
+      const y = freeY;
+      const block = memory.getBlock(f.blockId);
+      const cx = x + w / 2;
+      const cy = y + h / 2;
+
+      this.svg.appendChild(this._el('rect', {
+        x, y, width: w, height: h, rx: 8, class: 'mem-block mem-block--freed',
+      }));
+
+      const addr = this._el('text', { x: cx, y: y - 10, class: 'mem-addr', 'text-anchor': 'middle' });
+      addr.textContent = block ? MemoryModel.formatAddress(block.address) : '';
+      this.svg.appendChild(addr);
+
+      const val = this._el('text', {
+        x: cx, y: cy,
+        class: block && block.value === null ? 'mem-empty' : 'mem-value',
+        'text-anchor': 'middle', 'dominant-baseline': 'central',
+      });
+      val.textContent = block && block.value !== null ? String(block.value) : '∅';
+      this.svg.appendChild(val);
+
+      const lbl = this._el('text', { x: cx, y: y + h + 16, class: 'mem-label', 'text-anchor': 'middle' });
+      lbl.textContent = f.label || '';
+      this.svg.appendChild(lbl);
+
+      this.positions[f.blockId] = { cx, cy, x, y, w, h };
+      maxWidth = Math.max(maxWidth, cfg.padX * 2 + (i + 1) * (w + cfg.gapX));
+    });
+
+    // 空树提示
+    if (!nodes.length && !freed.length) {
+      const hint = this._el('text', { x: 40, y: cfg.padY + 40, class: 'mem-label' });
+      hint.textContent = '空树 / Empty tree';
+      this.svg.appendChild(hint);
+    }
+
+    // 内容放不下时横向滚动：宽度按内容宽度设置，高度按层数设置
+    this.svg.style.width = Math.max(maxWidth, 640) + 'px';
+    const contentH = freed.length
+      ? freeY + h + 96
+      : cfg.padY + (maxDepth + 1) * (h + cfg.gapY) + 80;
+    this.svg.style.height = Math.max(360, contentH) + 'px';
   }
 
   /** 绘制一个已分配块。 */

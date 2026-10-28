@@ -127,6 +127,18 @@ Preprocessor._PATTERNS = [
     re: new RegExp('^insert\\s*\\(\\s*' + IDENT + '\\s*,\\s*(-?\\d+)\\s*\\)$', 'i'),
     fmt: (m) => `insert(arr, ${m[1]});`,
   },
+  // insertLeft(t, i, v) / insertRight(t, i, v) —— 二叉树：挂为第 i 号结点的左/右孩子
+  {
+    exact: true,
+    re: new RegExp('^insert\\s*(left|right|l|r)\\s*\\(\\s*' + IDENT + '\\s*,\\s*(-?\\d+)\\s*,\\s*(-?\\d+)\\s*\\)$', 'i'),
+    fmt: (m) => `${/^l/i.test(m[1]) ? 'insertLeft' : 'insertRight'}(t, ${m[2]}, ${m[3]});`,
+  },
+  // preorder / inorder / postorder / levelorder —— 二叉树遍历
+  {
+    exact: true,
+    re: /^(preorder|inorder|postorder|levelorder)\s*\(\s*(?:[a-zA-Z_]\w*)?\s*\)$/i,
+    fmt: (m) => `${m[1].toLowerCase()}(t);`,
+  },
   // remove(arr, i) / delete(arr, i)
   {
     exact: true,
@@ -187,6 +199,12 @@ Preprocessor._PATTERNS = [
     exact: true,
     re: /^insert\s*\(\s*(-?\d+)\s*,\s*(-?\d+)\s*\)$/i,
     fmt: (m) => `insert(arr, ${m[1]}, ${m[2]});`,
+  },
+  // insertLeft(i, v) / insertRight(i, v)
+  {
+    exact: true,
+    re: /^insert\s*(left|right|l|r)\s*\(\s*(-?\d+)\s*,\s*(-?\d+)\s*\)$/i,
+    fmt: (m) => `${/^l/i.test(m[1]) ? 'insertLeft' : 'insertRight'}(t, ${m[2]}, ${m[3]});`,
   },
   // insert(v)
   {

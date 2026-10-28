@@ -112,9 +112,20 @@ export class CommandParser {
     m = stmt.match(new RegExp('^insert\\s*\\(\\s*' + IDENT + '\\s*,\\s*(-?\\d+)\\s*,\\s*(-?\\d+)\\s*\\)$', 'i'));
     if (m) return { type: 'insert', index: +m[1], value: +m[2], line };
 
-    // insert(arr, v) —— 两个参数（末尾追加）
+    // insert(arr, v) —— 两个参数（末尾追加；二叉树中表示建立根结点）
     m = stmt.match(new RegExp('^insert\\s*\\(\\s*' + IDENT + '\\s*,\\s*(-?\\d+)\\s*\\)$', 'i'));
     if (m) return { type: 'insert', index: null, value: +m[1], line };
+
+    // insertLeft(t, i, v) / insertRight(t, i, v) —— 二叉树：挂为第 i 号结点的左/右孩子
+    m = stmt.match(new RegExp('^insert\\s*(left|right|l|r)\\s*\\(\\s*' + IDENT + '\\s*,\\s*(-?\\d+)\\s*,\\s*(-?\\d+)\\s*\\)$', 'i'));
+    if (m) {
+      const left = /^l/i.test(m[1]);
+      return { type: left ? 'insertLeft' : 'insertRight', index: +m[2], value: +m[3], line };
+    }
+
+    // preorder / inorder / postorder / levelorder（二叉树遍历）
+    m = stmt.match(new RegExp('^(preorder|inorder|postorder|levelorder)\\s*\\(\\s*(?:' + IDENT + ')?\\s*\\)$', 'i'));
+    if (m) return { type: m[1].toLowerCase(), index: null, value: null, line };
 
     // remove(arr, i) / delete(arr, i)
     m = stmt.match(new RegExp('^(?:remove|delete)\\s*\\(\\s*' + IDENT + '\\s*,\\s*(-?\\d+)\\s*\\)$', 'i'));
@@ -152,6 +163,13 @@ export class CommandParser {
     // insert(i, v)
     m = stmt.match(/^insert\s*\(\s*(-?\d+)\s*,\s*(-?\d+)\s*\)$/i);
     if (m) return { type: 'insert', index: +m[1], value: +m[2], line };
+
+    // insertLeft(i, v) / insertRight(i, v) —— 二叉树简写
+    m = stmt.match(/^insert\s*(left|right|l|r)\s*\(\s*(-?\d+)\s*,\s*(-?\d+)\s*\)$/i);
+    if (m) {
+      const left = /^l/i.test(m[1]);
+      return { type: left ? 'insertLeft' : 'insertRight', index: +m[2], value: +m[3], line };
+    }
 
     // insert(v) —— 末尾追加
     m = stmt.match(/^insert\s*\(\s*(-?\d+)\s*\)$/i);
@@ -202,10 +220,10 @@ export class CommandParser {
     const sim = new Map();
     const simMem = { read: (id) => (sim.has(id) ? sim.get(id) : null) };
     const kind = structure.kind || 'array';
-    // 链表的“规划期链”：结点 id 的顺序由 plan* 就地推进，供后续指令继续规划。
-    // （链表没有 slots，规划起点直接取当前真实链长；其余结构由调用方先重置为空结构。）
-    const ctx = kind === 'linked' ? structure.planningContext() : null;
-    let len = ctx ? ctx.chain.length : 0;
+    // 链表 / 二叉树的“规划期形态”：结点 id 与指针由 plan* 就地推进，供后续指令继续规划。
+    // （这两种结构没有预分配 slots，规划起点直接取结构当前形态；其余结构由调用方先重置为空结构。）
+    const ctx = (kind === 'linked' || kind === 'binarytree') ? structure.planningContext() : null;
+    let len = kind === 'linked' ? ctx.chain.length : kind === 'binarytree' ? ctx.byIndex.size : 0;
     // 队列的“规划期队头”：代码模式一次性规划多行，真实 front 要等动画执行到
     // META 步骤才会变，因此必须自己推进，否则出队后的下次入队会覆盖旧槽位。
     let front = kind === 'queue' ? structure.front % structure.capacity : 0;
@@ -223,6 +241,13 @@ export class CommandParser {
           CommandParser._simulate(sim, s);
         }
         len = ctx.chain.length;
+      } else if (kind === 'binarytree') {
+        // 二叉树没有预分配的连续槽位：初始化值按【层序序列】逐个建立结点。
+        const s = structure.planBuildLevelOrder(declaration.values, ctx);
+        for (const st of s) st.line = declaration.line;
+        steps.push(...s);
+        CommandParser._simulate(sim, s);
+        len = ctx.byIndex.size;
       } else {
         const limit = kind === 'queue'
           ? Math.min(structure.slots.length, structure.maxSize)
@@ -269,6 +294,17 @@ export class CommandParser {
             }
           } else if (kind === 'queue') {
             errors.push(CommandParser._kindErr(c.line, kind));
+          } else if (kind === 'binarytree') {
+            // 二叉树只允许按“父结点 + 左/右孩子”插入；insert(t, v) 仅用于建立根结点。
+            if (c.index !== null) {
+              errors.push(CommandParser._err(c.line, '错误：二叉树请使用 insertLeft(t, i, v) / insertRight(t, i, v) 指定左/右孩子', 'Error: use insertLeft(t, i, v) / insertRight(t, i, v) to specify the left/right child'));
+            } else if (ctx.byIndex.size > 0) {
+              errors.push(CommandParser._err(c.line, '错误：树中已有根结点，请使用 insertLeft / insertRight 插入孩子', 'Error: the tree already has a root; use insertLeft / insertRight to attach a child'));
+            } else {
+              const err = structure.insertError(1, 'L', ctx);
+              if (err) errors.push(CommandParser._errMsg(c.line, err));
+              else s = structure.planInsert(1, 'L', c.value, ctx);
+            }
           } else if (kind === 'linked') {
             const err = structure.insertError(pos, len);
             if (err) errors.push(CommandParser._errMsg(c.line, err));
@@ -281,7 +317,11 @@ export class CommandParser {
           break;
         }
         case 'remove': {
-          if (len === 0) {
+          if (kind === 'binarytree') {
+            const err = structure.deleteError(c.index, ctx);
+            if (err) errors.push(CommandParser._errMsg(c.line, err));
+            else s = structure.planDelete(c.index, ctx, simMem);
+          } else if (len === 0) {
             errors.push(CommandParser._err(c.line, `当前结构为空，无法操作`, `The structure is empty`));
           } else if (kind === 'stack') {
             if (c.index !== len) {
@@ -322,7 +362,11 @@ export class CommandParser {
           break;
         }
         case 'search': {
-          if (kind === 'linked') {
+          if (kind === 'binarytree') {
+            const err = structure.searchError(ctx);
+            if (err) errors.push(CommandParser._errMsg(c.line, err));
+            else s = structure.planSearch(c.value, ctx, simMem);
+          } else if (kind === 'linked') {
             const err = structure.searchError(len);
             if (err) errors.push(CommandParser._errMsg(c.line, err));
             else s = structure.planSearch(c.value, len, simMem, ctx);
@@ -332,7 +376,9 @@ export class CommandParser {
           break;
         }
         case 'push': {
-          if (kind === 'queue') {
+          if (kind === 'binarytree') {
+            errors.push(CommandParser._kindErr(c.line, kind));
+          } else if (kind === 'queue') {
             const err = structure.enqueueError(len, front, simMem);
             if (err) errors.push(CommandParser._errMsg(c.line, err));
             else s = structure.planEnqueue(c.value, len, simMem, front);
@@ -350,7 +396,9 @@ export class CommandParser {
           break;
         }
         case 'pop': {
-          if (len <= 0) {
+          if (kind === 'binarytree') {
+            errors.push(CommandParser._kindErr(c.line, kind));
+          } else if (len <= 0) {
             errors.push(CommandParser._err(c.line, `当前结构为空，无法操作`, `The structure is empty`));
           } else if (kind === 'stack') {
             s = structure.planPop(len, simMem);
@@ -385,6 +433,34 @@ export class CommandParser {
           }
           break;
         }
+        case 'insertLeft':
+        case 'insertRight': {
+          if (kind !== 'binarytree') {
+            errors.push(CommandParser._err(c.line, '错误：当前结构不是二叉树，不能插入孩子结点', 'Error: the current structure is not a binary tree; cannot attach a child'));
+          } else {
+            const side = c.type === 'insertLeft' ? 'L' : 'R';
+            const err = structure.insertError(c.index, side, ctx);
+            if (err) errors.push(CommandParser._errMsg(c.line, err));
+            else s = structure.planInsert(c.index, side, c.value, ctx);
+          }
+          break;
+        }
+        case 'preorder':
+        case 'inorder':
+        case 'postorder':
+        case 'levelorder': {
+          if (kind !== 'binarytree') {
+            errors.push(CommandParser._err(c.line, '错误：当前结构不是二叉树，不能进行树遍历', 'Error: the current structure is not a binary tree; traversal is unavailable'));
+          } else {
+            const err = structure.traversalError(ctx);
+            if (err) errors.push(CommandParser._errMsg(c.line, err));
+            else {
+              const method = 'plan' + c.type.charAt(0).toUpperCase() + c.type.slice(1);
+              s = structure[method](ctx, simMem);
+            }
+          }
+          break;
+        }
         default:
           break;
       }
@@ -397,7 +473,11 @@ export class CommandParser {
 
       // 向前推进“模拟状态”，供下一行规划使用。
       CommandParser._simulate(sim, s);
-      len = kind === 'linked' ? ctx.chain.length : CommandParser._nextLen(c.type, len);
+      len = kind === 'linked'
+        ? ctx.chain.length
+        : kind === 'binarytree'
+          ? ctx.byIndex.size
+          : CommandParser._nextLen(c.type, len);
 
       // 队列出队（dequeue / pop / remove(0)）后队头也要跟着推进，保持规划期状态一致。
       const dequeued =
@@ -455,6 +535,13 @@ export class CommandParser {
         line,
         '错误：链表请使用 insert / remove / search（push / pop 等价于表尾插入 / 删除）',
         'Error: use insert / remove / search on a linked list (push / pop mean append / delete at the tail)'
+      );
+    }
+    if (kind === 'binarytree') {
+      return CommandParser._err(
+        line,
+        '错误：二叉树请使用 insertLeft / insertRight / remove / search / preorder / inorder / postorder / levelorder',
+        'Error: use insertLeft / insertRight / remove / search / preorder / inorder / postorder / levelorder on a binary tree'
       );
     }
     return CommandParser._err(

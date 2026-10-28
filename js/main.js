@@ -13,6 +13,7 @@ import { Renderer } from './render/Renderer.js';
 import { Animator } from './animation/Animator.js';
 import { ArrayDS } from './structures/ArrayDS.js';
 import { LinkedListDS } from './structures/LinkedListDS.js';
+import { BinaryTreeDS } from './structures/BinaryTreeDS.js';
 import { StackDS } from './structures/StackDS.js';
 import { QueueDS } from './structures/QueueDS.js';
 import { CommandParser } from './core/CommandParser.js';
@@ -62,7 +63,7 @@ const animator = new Animator(
 const SPEED_MAP = { slow: 800, normal: 400, fast: 100, instant: 0 };
 
 // 各结构的默认容量
-const DEFAULT_CAPACITY = { array: 8, linked: 8, stack: 8, queue: 6 };
+const DEFAULT_CAPACITY = { array: 8, linked: 8, stack: 8, queue: 6, binarytree: 15 };
 
 // 各结构支持的操作项（value -> 中英标签）
 const OPS = {
@@ -88,6 +89,16 @@ const OPS = {
     ['dequeue', '出队 Dequeue'],
     ['front', '查看队头 Front'],
     ['search', '查找 Search'],
+  ],
+  binarytree: [
+    ['insertLeft', '插入左孩子 Insert Left'],
+    ['insertRight', '插入右孩子 Insert Right'],
+    ['delete', '删除子树 Delete'],
+    ['search', '查找 Search'],
+    ['preorder', '先序遍历 Preorder'],
+    ['inorder', '中序遍历 Inorder'],
+    ['postorder', '后序遍历 Postorder'],
+    ['levelorder', '层次遍历 Level-order'],
   ],
 };
 
@@ -165,6 +176,25 @@ int main() {
     printf("演示结束（打印语句会被忽略）\\n");
     return 0;
 }`,
+  binarytree: `#include <stdio.h>
+
+int main() {
+    // 二叉链表：每个结点单独 malloc，lchild / rchild 分别指向左右孩子
+    // 初始化按层序序列建树：根 = 10，左孩子 20、右孩子 30，依此类推
+    int T[15] = {10, 20, 30, 40, 50, 60, 70};
+
+    insertLeft(T, 4, 80);   // 第 4 号结点（40）挂左孩子，成为第 8 号
+    insertRight(T, 4, 90);  // 第 4 号结点（40）挂右孩子，成为第 9 号
+    preorder(T);            // 先序遍历：根 → 左 → 右
+    inorder(T);             // 中序遍历：左 → 根 → 右
+    postorder(T);           // 后序遍历：左 → 右 → 根
+    levelorder(T);          // 层次遍历：逐层从左到右
+    search(T, 50);          // 先序查找
+    remove(T, 2);           // 删除以第 2 号结点为根的整棵子树
+
+    printf("演示结束（打印语句会被忽略）\\n");
+    return 0;
+}`,
 };
 
 // ---------- 4. 工具函数 ----------
@@ -206,8 +236,9 @@ function handleError(e) {
 /** 根据当前选择的操作类型，显示/隐藏对应输入项。 */
 function syncFields() {
   const op = opSelect.value;
-  const needIndex = op === 'insert' || op === 'delete' || op === 'set';
-  const needValue = op === 'insert' || op === 'set' || op === 'search' || op === 'push' || op === 'enqueue';
+  const needIndex = op === 'insert' || op === 'delete' || op === 'set' || op === 'insertLeft' || op === 'insertRight';
+  const needValue = op === 'insert' || op === 'set' || op === 'search' || op === 'push' || op === 'enqueue'
+    || op === 'insertLeft' || op === 'insertRight';
   indexField.style.display = needIndex ? 'flex' : 'none';
   valueField.style.display = needValue ? 'flex' : 'none';
 }
@@ -224,6 +255,7 @@ function parseIntValue(input) {
 // ---------- 5. 结构构建 / 重置 ----------
 function createStructure(kind, mem, capacity) {
   if (kind === 'linked') return new LinkedListDS(mem, capacity);
+  if (kind === 'binarytree') return new BinaryTreeDS(mem, capacity);
   if (kind === 'stack') return new StackDS(mem, capacity);
   if (kind === 'queue') return new QueueDS(mem, capacity);
   return new ArrayDS(mem, capacity);
@@ -362,6 +394,28 @@ function execute() {
       if (structure.length === 0) return addLog({ zh: '队列为空，无法查找', en: 'The queue is empty' });
       steps = structure.planSearch(value);
     }
+  } else if (structKind === 'binarytree') {
+    if (op === 'insertLeft' || op === 'insertRight') {
+      if (index === null || value === null) return addLog({ zh: '请输入合法的父结点位序和值', en: 'Invalid parent index or value' });
+      const side = op === 'insertLeft' ? 'L' : 'R';
+      const err = structure.insertError(index, side);
+      if (err) return addLog(err, true);
+      steps = structure.planInsert(index, side, value);
+    } else if (op === 'delete') {
+      if (index === null) return addLog({ zh: '请输入合法的结点位序', en: 'Invalid node index' });
+      const err = structure.deleteError(index);
+      if (err) return addLog(err, true);
+      steps = structure.planDelete(index);
+    } else if (op === 'search') {
+      if (value === null) return addLog({ zh: '请输入合法的查找值', en: 'Invalid value' });
+      const err = structure.searchError();
+      if (err) return addLog(err, true);
+      steps = structure.planSearch(value);
+    } else if (op === 'preorder' || op === 'inorder' || op === 'postorder' || op === 'levelorder') {
+      const err = structure.traversalError();
+      if (err) return addLog(err, true);
+      steps = structure['plan' + op.charAt(0).toUpperCase() + op.slice(1)]();
+    }
   }
 
   if (!steps.length) return;
@@ -426,7 +480,14 @@ function runCode() {
   // 代码模式从“声明初始化”开始：让结构内部元素个数与初始化真实写入的数量一致，
   // 后续插入/删除/入栈出队的 length++/-- 才能累积出正确结果。
   // 链表没有预分配槽位，初始化值会在 buildSteps 里按尾插法逐个建立结点，这里不处理。
-  if (declaration && structKind !== 'linked') structure.setInitialLength(declaration.values.length);
+  // 二叉树同理：初始化值在 buildSteps 里按层序逐个建立结点。
+  if (declaration && structKind !== 'linked' && structKind !== 'binarytree') structure.setInitialLength(declaration.values.length);
+  if (declaration && structKind === 'binarytree' && declaration.values.length > structure.maxNodes) {
+    addLog({
+      zh: `二叉树结点数达到演示上限 ${structure.maxNodes}，初始化时多余的 ${declaration.values.length - structure.maxNodes} 个值已忽略`,
+      en: `Binary tree node limit ${structure.maxNodes} reached; ${declaration.values.length - structure.maxNodes} extra initial value(s) ignored`,
+    }, true);
+  }
 
   // 循环队列牺牲一个单元，初始化值超过 MaxSize-1 时多余部分会被忽略，这里明确提示。
   if (declaration && structKind === 'queue' && declaration.values.length > structure.maxSize) {
