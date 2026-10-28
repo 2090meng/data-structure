@@ -19,6 +19,14 @@
  */
 const IDENT = '[a-zA-Z_]\\w*';
 
+// C 风格“右移插入”：for(...) { arr[i] = arr[i-1]; } 后接 arr[k] = v
+// 例如教材里的插入算法，识别后映射为 insert(arr, k, v)，触发元素后移动画。
+const INSERT_PATTERN = /for\s*\([^)]*\)\s*\{[\s\S]*?arr\[i\]\s*=\s*arr\[i\s*-\s*1\];[\s\S]*?\}\s*arr\[(\d+)\]\s*=\s*(-?\d+);/g;
+
+// C 风格“左移删除”：for (int i = k; ...) { arr[i] = arr[i+1]; }
+// 映射为 remove(arr, k)，触发元素前移动画。
+const DELETE_PATTERN = /for\s*\([^)]*?\bi\s*=\s*(\d+)[^)]*\)\s*\{[\s\S]*?arr\[i\]\s*=\s*arr\[i\s*\+\s*1\];[\s\S]*?\}/g;
+
 export class Preprocessor {
   /** 单次提取最多保留的指令条数（防御超大输入导致页面卡死）。 */
   static MAX_EXTRACT = 100;
@@ -34,7 +42,13 @@ export class Preprocessor {
     let ignoredCount = 0;
     let truncated = false;
 
-    const lines = String(code || '').split(/\r?\n/);
+    // 先做 C 风格“数组移位”模式识别：把 for 循环实现的后移插入 / 前移删除
+    // 转换成 insert / remove 指令，随后由下面的白名单统一提取。
+    let text = String(code || '');
+    text = text.replace(INSERT_PATTERN, (m, k, v) => `insert(arr, ${k}, ${v});`);
+    text = text.replace(DELETE_PATTERN, (m, k) => `remove(arr, ${k});`);
+
+    const lines = text.split(/\r?\n/);
 
     outer:
     for (const line of lines) {

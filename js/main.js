@@ -200,16 +200,19 @@ function runCode() {
   try {
   syncCodeView();
 
-  const { commands, declaration, ignoredCount, truncated } = CommandParser.parse(codeInput.value);
+  // 先清洗 + 跨行模式识别：把 for 循环实现的数组移位识别为 insert / remove。
+  const cleaned = Preprocessor.extract(codeInput.value);
+
+  const { commands, declaration, truncated } = CommandParser.parse(cleaned.output);
 
   // 声明决定容量（默认 8，且不小于初始化元素个数）
   const capacity = declaration ? Math.max(declaration.capacity, declaration.values.length, 1) : 8;
   resetAll(capacity);
 
-  if (ignoredCount > 0) {
-    addLog({ zh: `已忽略 ${ignoredCount} 条无法识别的语句`, en: `Ignored ${ignoredCount} unrecognized statement(s)` });
+  if (cleaned.ignoredCount > 0) {
+    addLog({ zh: `已忽略 ${cleaned.ignoredCount} 条无关语句`, en: `Ignored ${cleaned.ignoredCount} irrelevant statement(s)` });
   }
-  if (truncated) {
+  if (cleaned.truncated || truncated) {
     addLog({ zh: `指令过多，仅提取前 ${CommandParser.MAX_COMMANDS} 条`, en: `Too many commands, only the first ${CommandParser.MAX_COMMANDS} were used` }, true);
   }
 
@@ -263,22 +266,37 @@ langSelect.addEventListener('change', () => i18n.setLang(langSelect.value));
 speedSelect.addEventListener('change', () => animator.setSpeed(SPEED_MAP[speedSelect.value]));
 
 // ---------- 8. 初始渲染 ----------
-// 预填一段 C 风格示例代码，方便第一次直接点击「运行代码」体验
-codeInput.value = [
-  '// 示例：C 风格数组操作',
-  '#include <stdio.h>',
-  '',
-  'int main() {',
-  '  int arr[10] = {10, 20, 5};',
-  '',
-  '  arr[1] = 20;',
-  '  insert(arr, 1, 20);',
-  '  push(arr, 7);',
-  '  pop(arr);',
-  '  search(arr, 20);',
-  '  return 0;',
-  '}',
-].join('\n');
+// 预填一段 C 风格示例代码：演示数组初始化 + 下标插入（右移）+ 下标删除（左移）
+codeInput.value = `#include <stdio.h>
+
+int main() {
+    // 1. 初始化一个容量为 8 的数组，目前有 5 个有效元素
+    int arr[8] = {10, 20, 30, 40, 50};
+    int length = 5;
+    int capacity = 8;
+
+    // 操作 1：在下标 2 的位置插入元素 99
+    for (int i = length; i > 2; i--) {
+        arr[i] = arr[i - 1]; // 从后往前挪，腾出空间
+    }
+    arr[2] = 99;
+    length++; // 长度加 1
+
+    // 操作 2：删除下标 1 的元素（即 20）
+    for (int i = 1; i < length - 1; i++) {
+        arr[i] = arr[i + 1]; // 从前往后挪，覆盖被删除的元素
+    }
+    length--; // 长度减 1
+
+    // 打印最终结果（打印语句会被忽略）
+    printf("最终数组内容: ");
+    for (int i = 0; i < length; i++) {
+        printf("%d ", arr[i]);
+    }
+    printf("\\n");
+
+    return 0;
+}`;
 syncFields();
 syncCodeView();
 animator.setSpeed(SPEED_MAP[speedSelect.value]);
