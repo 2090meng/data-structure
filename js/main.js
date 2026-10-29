@@ -75,6 +75,8 @@ const OPS = {
   ],
   linked: [
     ['insert', '插入 Insert'],
+    ['insertHead', '头插法 Head Insert'],
+    ['insertTail', '尾插法 Tail Insert'],
     ['delete', '删除 Delete'],
     ['search', '查找 Search'],
   ],
@@ -140,8 +142,9 @@ int main() {
     // 单链表：带头结点，每个结点单独 malloc，地址不连续
     int L[8] = {10, 20, 30};   // 尾插法依次建立 10 -> 20 -> 30
 
-    insert(L, 1, 5);    // 头插：p = 头结点; s->next = p->next; p->next = s;
-    insert(L, 3, 99);   // 在第 3 个位置前插入 99
+    insertHead(L, 5);   // 头插法：s->next = L->next; L->next = s;  链表变 5 -> 10 -> 20 -> 30
+    insertTail(L, 99);  // 尾插法：p 走到表尾；s->next = NULL; p->next = s;
+    insert(L, 3, 88);   // 在第 3 个位置前插入 88
     remove(L, 2);       // 删除第 2 个结点：p->next = q->next; free(q);
     search(L, 30);      // p = p->next 逐个比较
 
@@ -238,7 +241,7 @@ function syncFields() {
   const op = opSelect.value;
   const needIndex = op === 'insert' || op === 'delete' || op === 'set' || op === 'insertLeft' || op === 'insertRight';
   const needValue = op === 'insert' || op === 'set' || op === 'search' || op === 'push' || op === 'enqueue'
-    || op === 'insertLeft' || op === 'insertRight';
+    || op === 'insertLeft' || op === 'insertRight' || op === 'insertHead' || op === 'insertTail';
   indexField.style.display = needIndex ? 'flex' : 'none';
   valueField.style.display = needValue ? 'flex' : 'none';
 }
@@ -345,6 +348,11 @@ function execute() {
       const err = structure.insertError(index);
       if (err) return addLog(err, true);
       steps = structure.planInsert(index, value);
+    } else if (op === 'insertHead' || op === 'insertTail') {
+      if (value === null) return addLog({ zh: '请输入合法的插入值', en: 'Invalid value' });
+      const err = op === 'insertHead' ? structure.insertHeadError() : structure.insertTailError();
+      if (err) return addLog(err, true);
+      steps = op === 'insertHead' ? structure.planInsertHead(value) : structure.planInsertTail(value);
     } else if (op === 'delete') {
       if (index === null) return addLog({ zh: '请输入合法的位序', en: 'Invalid position' });
       const err = structure.deleteError(index);

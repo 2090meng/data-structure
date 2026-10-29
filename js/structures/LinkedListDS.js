@@ -10,6 +10,15 @@
  *       s->data = e;
  *       s->next = p->next;   // ① 先让新结点指向原第 i 个结点
  *       p->next = s;         // ② 再让前驱结点指向新结点（顺序不可交换）
+ *   头插法（插在头结点之后，成为第 1 个结点，O(1)）：
+ *       s->next = L->next;
+ *       L->next = s;
+ *   尾插法（走到表尾再挂链，O(n)）：
+ *       p = L; while (p->next) p = p->next;
+ *       s->next = NULL;
+ *       p->next = s;
+ *   头插法 / 尾插法建表（buildHead / buildTail）分别对应这两种插入的重复执行，
+ *   头插法建表得到的顺序与输入序列【相反】，尾插法建表保持输入顺序（教材经典对照）。
  *   删除第 i 个结点：
  *       p = GetElem(L, i-1);  q = p->next;
  *       p->next = q->next;
@@ -82,6 +91,28 @@ export class LinkedListDS {
         en: `Error: insert position ${pos} out of range (1..${len + 1})`,
       };
     }
+    if (len >= this.maxNodes) {
+      return {
+        zh: `错误：结点数已达演示上限 ${this.maxNodes}，无法继续插入`,
+        en: `Error: node limit ${this.maxNodes} reached, cannot insert`,
+      };
+    }
+    return null;
+  }
+
+  /** 头插法前校验：只受结点数上限约束（新结点总插在头结点之后）。 */
+  insertHeadError(len = this.length) {
+    if (len >= this.maxNodes) {
+      return {
+        zh: `错误：结点数已达演示上限 ${this.maxNodes}，无法继续插入`,
+        en: `Error: node limit ${this.maxNodes} reached, cannot insert`,
+      };
+    }
+    return null;
+  }
+
+  /** 尾插法前校验：只受结点数上限约束（新结点总挂到表尾）。 */
+  insertTailError(len = this.length) {
     if (len >= this.maxNodes) {
       return {
         zh: `错误：结点数已达演示上限 ${this.maxNodes}，无法继续插入`,
@@ -182,6 +213,235 @@ export class LinkedListDS {
     // 推进规划期状态（只有传入 ctx 时才影响后续指令的规划）
     chain.splice(pos - 1, 0, node.id);
     state.length = chain.length;
+    return steps;
+  }
+
+  /**
+   * 规划：头插法把 value 插在头结点之后（成为第 1 个结点）。
+   *   s->next = L->next;  L->next = s;
+   * 不需要找前驱，时间复杂度 O(1)。
+   */
+  planInsertHead(value, len = this.length, ctx = null) {
+    const state = ctx || { chain: this.chain.slice(), length: this.length };
+    const chain = state.chain;
+    if (this.insertHeadError(chain.length)) return [];
+
+    const firstId = chain.length ? chain[0] : null;
+    const node = this._allocNode();
+    node.meta.label = '新结点';
+    const steps = [];
+
+    steps.push(
+      makeStep(STEP.HIGHLIGHT, { block: this.head.id }, {
+        zh: `p = L：p 指向头结点（${this._addr(this.head.id)}），L->next 指向 ${firstId ? `第 1 个结点（${this._addr(firstId)}）` : 'NULL'}`,
+        en: `p = L: p points to the head node (${this._addr(this.head.id)}); L->next points to ${firstId ? `node 1 (${this._addr(firstId)})` : 'NULL'}`,
+      })
+    );
+
+    steps.push(
+      makeStep(STEP.SET_VALUE, { block: node.id, value }, {
+        zh: `s = (LinkNode)malloc(sizeof(LNode))；s->data = ${value}（新结点 ${MemoryModel.formatAddress(node.address)}）`,
+        en: `s = malloc(...); s->data = ${value} (new node at ${MemoryModel.formatAddress(node.address)})`,
+      })
+    );
+
+    steps.push(
+      makeStep(STEP.META, {
+        run: () => { this.next.set(node.id, firstId); },
+        undo: () => { this.next.delete(node.id); },
+      }, {
+        zh: `s->next = L->next（指向 ${firstId ? this._addr(firstId) : 'NULL'}）`,
+        en: `s->next = L->next (points to ${firstId ? this._addr(firstId) : 'NULL'})`,
+      })
+    );
+
+    steps.push(
+      makeStep(STEP.META, {
+        run: () => {
+          this.next.set(this.head.id, node.id);
+          this.chain.unshift(node.id);
+          this.length++;
+        },
+        undo: () => {
+          this.next.set(this.head.id, firstId);
+          const i = this.chain.indexOf(node.id);
+          if (i >= 0) this.chain.splice(i, 1);
+          this.length--;
+        },
+      }, {
+        zh: `L->next = s：新结点成为第 1 个结点，元素个数 = ${chain.length + 1}`,
+        en: `L->next = s: the new node becomes element 1, size = ${chain.length + 1}`,
+      })
+    );
+
+    steps.push(makeStep(STEP.UNHIGHLIGHT, { block: this.head.id }));
+
+    chain.unshift(node.id);
+    state.length = chain.length;
+    return steps;
+  }
+
+  /**
+   * 规划：尾插法把 value 挂到表尾。
+   *   p = L; while (p->next) p = p->next;  s->next = NULL;  p->next = s;
+   * 需要从头结点走到表尾，时间复杂度 O(n)；动画里会逐个高亮 p 走过的结点。
+   */
+  planInsertTail(value, len = this.length, ctx = null) {
+    const state = ctx || { chain: this.chain.slice(), length: this.length };
+    const chain = state.chain;
+    if (this.insertTailError(chain.length)) return [];
+
+    const node = this._allocNode();
+    node.meta.label = '新结点';
+    const steps = [];
+
+    steps.push(
+      makeStep(STEP.HIGHLIGHT, { block: this.head.id }, {
+        zh: `p = L：从表头出发寻找表尾（头结点 ${this._addr(this.head.id)}）`,
+        en: `p = L: start from the head node (${this._addr(this.head.id)}) to find the tail`,
+      })
+    );
+
+    let prev = this.head.id;
+    for (let i = 0; i < chain.length; i++) {
+      const id = chain[i];
+      steps.push(makeStep(STEP.UNHIGHLIGHT, { block: prev }));
+      steps.push(
+        makeStep(STEP.HIGHLIGHT, { block: id }, {
+          zh: `p = p->next：p 指向第 ${i + 1} 个结点（${this._addr(id)}）`,
+          en: `p = p->next: p points to node ${i + 1} (${this._addr(id)})`,
+        })
+      );
+      prev = id;
+    }
+
+    steps.push(
+      makeStep(STEP.SET_VALUE, { block: node.id, value }, {
+        zh: `s = (LinkNode)malloc(sizeof(LNode))；s->data = ${value}；s->next = NULL（新结点 ${MemoryModel.formatAddress(node.address)}）`,
+        en: `s = malloc(...); s->data = ${value}; s->next = NULL (new node at ${MemoryModel.formatAddress(node.address)})`,
+      })
+    );
+
+    steps.push(
+      makeStep(STEP.META, {
+        run: () => { this.next.set(node.id, null); },
+        undo: () => { this.next.delete(node.id); },
+      }, {
+        zh: `s->next = NULL（新结点作为表尾，其后无结点）`,
+        en: `s->next = NULL (the new node becomes the tail)`,
+      })
+    );
+
+    steps.push(
+      makeStep(STEP.META, {
+        run: () => {
+          this.next.set(prev, node.id);
+          this.chain.push(node.id);
+          this.length++;
+        },
+        undo: () => {
+          this.next.set(prev, null);
+          const i = this.chain.indexOf(node.id);
+          if (i >= 0) this.chain.splice(i, 1);
+          this.length--;
+        },
+      }, {
+        zh: `p 已走到表尾（${this._addr(prev)}）；p->next = s：新结点成为第 ${chain.length + 1} 个结点，元素个数 = ${chain.length + 1}`,
+        en: `p reached the tail (${this._addr(prev)}); p->next = s: the new node becomes element ${chain.length + 1}, size = ${chain.length + 1}`,
+      })
+    );
+
+    steps.push(makeStep(STEP.UNHIGHLIGHT, { block: prev }));
+
+    chain.push(node.id);
+    state.length = chain.length;
+    return steps;
+  }
+
+  /**
+   * 规划：头插法建表。按输入顺序反复头插，得到的逻辑顺序与输入【相反】。
+   *   for (v : values) { s = malloc; s->data = v; s->next = L->next; L->next = s; }
+   */
+  planBuildHead(values, ctx = null) {
+    const state = ctx || this.planningContext();
+    const steps = [];
+    for (const v of values) {
+      if (state.chain.length >= this.maxNodes) break;
+      steps.push(...this.planInsertHead(v, state.chain.length, state));
+    }
+    return steps;
+  }
+
+  /**
+   * 规划：尾插法建表（教材经典写法，用尾指针 r 避免每次重新找表尾）。
+   *   r = L;
+   *   for (v : values) { s = malloc; s->data = v; r->next = s; r = s; }
+   *   r->next = NULL;
+   */
+  planBuildTail(values, ctx = null) {
+    const state = ctx || this.planningContext();
+    const chain = state.chain;
+    const steps = [];
+    if (!values.length) return steps;
+
+    let rear = chain.length ? chain[chain.length - 1] : this.head.id;
+    steps.push(
+      makeStep(STEP.HIGHLIGHT, { block: rear }, {
+        zh: chain.length
+          ? `r 指向当前表尾：第 ${chain.length} 个结点（${this._addr(rear)}）`
+          : `r = L：空表时尾指针指向头结点（${this._addr(rear)}）`,
+        en: chain.length
+          ? `r points to the current tail: node ${chain.length} (${this._addr(rear)})`
+          : `r = L: on an empty list the rear pointer is the head node (${this._addr(rear)})`,
+      })
+    );
+
+    for (const v of values) {
+      if (chain.length >= this.maxNodes) break;
+      // 注意：必须在规划时就固定“当前表尾”的 id 供 META 闭包使用，
+      // 否则等动画执行到这里时 rear 已经指向后面新增的结点了。
+      const prev = rear;
+      const node = this._allocNode();
+      node.meta.label = '新结点';
+      steps.push(
+        makeStep(STEP.SET_VALUE, { block: node.id, value: v }, {
+          zh: `s = (LinkNode)malloc(sizeof(LNode))；s->data = ${v}（新结点 ${MemoryModel.formatAddress(node.address)}）`,
+          en: `s = malloc(...); s->data = ${v} (new node at ${MemoryModel.formatAddress(node.address)})`,
+        })
+      );
+      steps.push(
+        makeStep(STEP.META, {
+          run: () => {
+            this.next.set(prev, node.id);
+            this.next.set(node.id, null);
+            this.chain.push(node.id);
+            this.length++;
+          },
+          undo: () => {
+            this.next.set(prev, null);
+            this.next.delete(node.id);
+            const i = this.chain.indexOf(node.id);
+            if (i >= 0) this.chain.splice(i, 1);
+            this.length--;
+          },
+        }, {
+          zh: `r->next = s；r = s：新结点成为第 ${chain.length + 1} 个结点（${this._addr(node.id)}）`,
+          en: `r->next = s; r = s: the new node becomes element ${chain.length + 1} (${this._addr(node.id)})`,
+        })
+      );
+      steps.push(makeStep(STEP.UNHIGHLIGHT, { block: prev }));
+      steps.push(
+        makeStep(STEP.HIGHLIGHT, { block: node.id }, {
+          zh: `r = s：r 指向新的表尾（第 ${chain.length + 1} 个结点）`,
+          en: `r = s: r points to the new tail (node ${chain.length + 1})`,
+        })
+      );
+      chain.push(node.id);
+      state.length = chain.length;
+      rear = node.id;
+    }
+
+    steps.push(makeStep(STEP.UNHIGHLIGHT, { block: rear }));
     return steps;
   }
 

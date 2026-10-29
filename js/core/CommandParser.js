@@ -123,6 +123,22 @@ export class CommandParser {
       return { type: left ? 'insertLeft' : 'insertRight', index: +m[2], value: +m[3], line };
     }
 
+    // insertHead(L, v) / insertTail(L, v) —— 单链表的头插法 / 尾插法
+    m = stmt.match(new RegExp('^insert\\s*(head|tail)\\s*\\(\\s*' + IDENT + '\\s*,\\s*(-?\\d+)\\s*\\)$', 'i'));
+    if (m) return { type: /^h/i.test(m[1]) ? 'insertHead' : 'insertTail', index: null, value: +m[2], line };
+
+    // buildHead(L, v1, v2, ...) / buildTail(L, v1, v2, ...) —— 按序列建表
+    m = stmt.match(new RegExp('^build\\s*(head|tail)\\s*\\(\\s*' + IDENT + '\\s*,\\s*(-?\\d+(?:\\s*,\\s*-?\\d+)*)\\s*\\)$', 'i'));
+    if (m) {
+      return {
+        type: /^h/i.test(m[1]) ? 'buildHead' : 'buildTail',
+        values: m[2].split(',').map((x) => +x.trim()),
+        index: null,
+        value: null,
+        line,
+      };
+    }
+
     // preorder / inorder / postorder / levelorder（二叉树遍历）
     m = stmt.match(new RegExp('^(preorder|inorder|postorder|levelorder)\\s*\\(\\s*(?:' + IDENT + ')?\\s*\\)$', 'i'));
     if (m) return { type: m[1].toLowerCase(), index: null, value: null, line };
@@ -169,6 +185,22 @@ export class CommandParser {
     if (m) {
       const left = /^l/i.test(m[1]);
       return { type: left ? 'insertLeft' : 'insertRight', index: +m[2], value: +m[3], line };
+    }
+
+    // insertHead(v) / insertTail(v) —— 单链表头插 / 尾插简写
+    m = stmt.match(/^insert\s*(head|tail)\s*\(\s*(-?\d+)\s*\)$/i);
+    if (m) return { type: /^h/i.test(m[1]) ? 'insertHead' : 'insertTail', index: null, value: +m[2], line };
+
+    // buildHead(v1, v2, ...) / buildTail(v1, v2, ...) —— 建表简写
+    m = stmt.match(/^build\s*(head|tail)\s*\(\s*(-?\d+(?:\s*,\s*-?\d+)*)\s*\)$/i);
+    if (m) {
+      return {
+        type: /^h/i.test(m[1]) ? 'buildHead' : 'buildTail',
+        values: m[2].split(',').map((x) => +x.trim()),
+        index: null,
+        value: null,
+        line,
+      };
     }
 
     // insert(v) —— 末尾追加
@@ -313,6 +345,40 @@ export class CommandParser {
             errors.push(CommandParser._err(c.line, `错误：插入位序 ${pos} 越界（应为 1..${len + 1}）或数组已满`, `Error: position ${pos} out of range (1..${len + 1}) or array full`));
           } else {
             s = structure.planInsert(pos, c.value, len, simMem);
+          }
+          break;
+        }
+        case 'insertHead':
+        case 'insertTail': {
+          if (kind !== 'linked') {
+            errors.push(CommandParser._err(c.line, '错误：头插法 / 尾插法只适用于单链表', 'Error: head/tail insertion only applies to a linked list'));
+          } else if (c.type === 'insertHead') {
+            const err = structure.insertHeadError(len);
+            if (err) errors.push(CommandParser._errMsg(c.line, err));
+            else s = structure.planInsertHead(c.value, len, ctx);
+          } else {
+            const err = structure.insertTailError(len);
+            if (err) errors.push(CommandParser._errMsg(c.line, err));
+            else s = structure.planInsertTail(c.value, len, ctx);
+          }
+          break;
+        }
+        case 'buildHead':
+        case 'buildTail': {
+          if (kind !== 'linked') {
+            errors.push(CommandParser._err(c.line, '错误：建表指令只适用于单链表', 'Error: build commands only apply to a linked list'));
+          } else if (!Array.isArray(c.values) || !c.values.length) {
+            errors.push(CommandParser._err(c.line, '错误：建表指令至少需要一个值', 'Error: a build command needs at least one value'));
+          } else if (len + c.values.length > structure.maxNodes) {
+            errors.push(CommandParser._err(
+              c.line,
+              `错误：建表需要 ${len + c.values.length} 个结点，超过演示上限 ${structure.maxNodes}`,
+              `Error: building needs ${len + c.values.length} nodes, exceeding the limit ${structure.maxNodes}`
+            ));
+          } else if (c.type === 'buildHead') {
+            s = structure.planBuildHead(c.values, ctx);
+          } else {
+            s = structure.planBuildTail(c.values, ctx);
           }
           break;
         }

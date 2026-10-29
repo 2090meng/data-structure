@@ -133,6 +133,18 @@ Preprocessor._PATTERNS = [
     re: new RegExp('^insert\\s*(left|right|l|r)\\s*\\(\\s*' + IDENT + '\\s*,\\s*(-?\\d+)\\s*,\\s*(-?\\d+)\\s*\\)$', 'i'),
     fmt: (m) => `${/^l/i.test(m[1]) ? 'insertLeft' : 'insertRight'}(t, ${m[2]}, ${m[3]});`,
   },
+  // insertHead(L, v) / insertTail(L, v) —— 单链表头插法 / 尾插法
+  {
+    exact: true,
+    re: new RegExp('^insert\\s*(head|tail)\\s*\\(\\s*' + IDENT + '\\s*,\\s*(-?\\d+)\\s*\\)$', 'i'),
+    fmt: (m) => `${/^h/i.test(m[1]) ? 'insertHead' : 'insertTail'}(t, ${m[2]});`,
+  },
+  // buildHead(L, v1, v2, ...) / buildTail(L, v1, v2, ...) —— 按序列建表
+  {
+    exact: true,
+    re: new RegExp('^build\\s*(head|tail)\\s*\\(\\s*' + IDENT + '\\s*,\\s*(-?\\d+(?:\\s*,\\s*-?\\d+)*)\\s*\\)$', 'i'),
+    fmt: (m) => `${/^h/i.test(m[1]) ? 'buildHead' : 'buildTail'}(t, ${m[2].split(',').map((s) => s.trim()).join(', ')});`,
+  },
   // preorder / inorder / postorder / levelorder —— 二叉树遍历
   {
     exact: true,
@@ -205,6 +217,18 @@ Preprocessor._PATTERNS = [
     exact: true,
     re: /^insert\s*(left|right|l|r)\s*\(\s*(-?\d+)\s*,\s*(-?\d+)\s*\)$/i,
     fmt: (m) => `${/^l/i.test(m[1]) ? 'insertLeft' : 'insertRight'}(t, ${m[2]}, ${m[3]});`,
+  },
+  // insertHead(v) / insertTail(v)
+  {
+    exact: true,
+    re: /^insert\s*(head|tail)\s*\(\s*(-?\d+)\s*\)$/i,
+    fmt: (m) => `${/^h/i.test(m[1]) ? 'insertHead' : 'insertTail'}(t, ${m[2]});`,
+  },
+  // buildHead(v1, v2, ...) / buildTail(v1, v2, ...)
+  {
+    exact: true,
+    re: /^build\s*(head|tail)\s*\(\s*(-?\d+(?:\s*,\s*-?\d+)*)\s*\)$/i,
+    fmt: (m) => `${/^h/i.test(m[1]) ? 'buildHead' : 'buildTail'}(t, ${m[2].split(',').map((s) => s.trim()).join(', ')});`,
   },
   // insert(v)
   {

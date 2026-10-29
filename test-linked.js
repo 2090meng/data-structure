@@ -13,6 +13,7 @@
  *   G 代码模式：声明初始化（尾插）+ insert + remove + search
  *   H 真实 Renderer + Animator + 假 DOM：结点块 / data|next 两栏 / 箭头 / head 指针 / 灰显
  *   I 教材步骤顺序与日志文案（s->next / p->next / q->next / free(q)）
+ *   J~Q 头插法 / 尾插法 / 建表 / 上限防御 / 代码模式 / 指令提取
  *
  * H 部分沿用 test-stack-queue.js 的轻量“假 DOM”，不用浏览器即可验证真实渲染路径。
  */
@@ -21,6 +22,7 @@ import { LinkedListDS } from './js/structures/LinkedListDS.js';
 import { Renderer } from './js/render/Renderer.js';
 import { Animator } from './js/animation/Animator.js';
 import { CommandParser } from './js/core/CommandParser.js';
+import { Preprocessor } from './js/core/Preprocessor.js';
 import { STEP } from './js/core/Step.js';
 
 // ---------- 断言工具：同时打印预期结果与实际结果 ----------
@@ -406,6 +408,182 @@ console.log('\n【用例 I】步骤顺序与教材式日志');
   applySteps(mem, del);
   assertEq('I-6 删除后链表为空', [L.length, chainValues(L, mem)], [0, []]);
   assertEq('I-7 空表 head->next 再次为 NULL', L.next.get(L.head.id) ?? null, null);
+}
+
+// ============================================================
+// 7. 头插法 / 尾插法
+// ============================================================
+console.log('\n【用例 J】头插法：s->next = L->next; L->next = s;');
+{
+  const mem = new MemoryModel();
+  const L = new LinkedListDS(mem, 8);
+
+  applySteps(mem, L.planInsertHead(42));
+  assertEq('J-1 空表头插后只有 1 个元素', [chainValues(L, mem), L.length], [[42], 1]);
+  assertEq('J-2 head->next 指向新结点', L.next.get(L.head.id), L.chain[0]);
+  assertEq('J-3 新结点 next = NULL', L.next.get(L.chain[0]) ?? null, null);
+  assertEq('J-4 沿 next 走一遍', walkChain(L, mem), [42]);
+
+  for (const v of [10, 20, 30]) applySteps(mem, L.planInsertHead(v));
+  assertEq('J-5 连续头插结果与输入相反', chainValues(L, mem), [30, 20, 10, 42]);
+  assertEq('J-6 指针链一致', walkChain(L, mem), [30, 20, 10, 42]);
+  assertEq('J-7 元素个数', L.length, 4);
+}
+
+console.log('\n【用例 K】头插法步骤顺序：先 s->next 再 L->next');
+{
+  const mem = new MemoryModel();
+  const L = new LinkedListDS(mem, 8);
+  applySteps(mem, L.planInsert(L.chain.length + 1, 10));
+
+  const steps = L.planInsertHead(5);
+  assertEq('K-1 步骤类型：HIGHLIGHT → SET_VALUE → META(s->next) → META(L->next) → UNHIGHLIGHT',
+    steps.map((s) => s.type),
+    [STEP.HIGHLIGHT, STEP.SET_VALUE, STEP.META, STEP.META, STEP.UNHIGHLIGHT]);
+  const t = steps.map((s) => (s.text ? s.text.zh : ''));
+  const iS = t.findIndex((x) => /s->next = L->next/.test(x));
+  const iL = t.findIndex((x) => /L->next = s/.test(x));
+  assertEq('K-2 先 s->next = L->next，再 L->next = s', iS >= 0 && iL > iS, true);
+  assertEq('K-3 日志说明新结点成为第 1 个结点', t.some((x) => /第 1 个结点/.test(x)), true);
+
+  applySteps(mem, steps);
+  assertEq('K-4 头插后顺序', chainValues(L, mem), [5, 10]);
+  assertEq('K-5 新结点的 next 指向原第 1 个结点', mem.read(L.next.get(L.chain[0])), 10);
+}
+
+console.log('\n【用例 L】尾插法：p 走到表尾后 s->next = NULL; p->next = s;');
+{
+  const mem = new MemoryModel();
+  const L = new LinkedListDS(mem, 8);
+
+  applySteps(mem, L.planInsertTail(7));
+  assertEq('L-1 空表尾插', [chainValues(L, mem), L.length], [[7], 1]);
+  assertEq('L-2 head->next 指向新结点', L.next.get(L.head.id), L.chain[0]);
+  assertEq('L-3 尾结点 next = NULL', L.next.get(L.chain[0]) ?? null, null);
+
+  for (const v of [8, 9]) applySteps(mem, L.planInsertTail(v));
+  assertEq('L-4 尾插保持输入顺序', chainValues(L, mem), [7, 8, 9]);
+  assertEq('L-5 指针链一致', walkChain(L, mem), [7, 8, 9]);
+  assertEq('L-6 元素个数', L.length, 3);
+}
+
+console.log('\n【用例 M】尾插法日志：逐结点移动 p，再挂链');
+{
+  const { mem, L } = makeList([10, 20, 30]);
+  const steps = L.planInsertTail(99);
+  const t = steps.map((s) => (s.text ? s.text.zh : ''));
+
+  assertEq('M-1 从表头出发寻找表尾', /p = L/.test(t[0]), true);
+  assertEq('M-2 逐个移动 p 到表尾（高亮每个结点）', t.filter((x) => /p = p->next/.test(x)).length, 3);
+  assertEq('M-3 日志含 p 已走到表尾', t.some((x) => /p 已走到表尾/.test(x)), true);
+  const iNull = t.findIndex((x) => /s->next = NULL/.test(x));
+  const iLink = t.findIndex((x) => /p->next = s/.test(x));
+  assertEq('M-4 先 s->next = NULL 再 p->next = s', iNull >= 0 && iLink > iNull, true);
+  assertEq('M-5 最后一步取消高亮', steps[steps.length - 1].type, STEP.UNHIGHLIGHT);
+
+  applySteps(mem, steps);
+  assertEq('M-6 尾插后顺序', chainValues(L, mem), [10, 20, 30, 99]);
+  assertEq('M-7 指针链一致', walkChain(L, mem), [10, 20, 30, 99]);
+}
+
+console.log('\n【用例 N】头插法建表 / 尾插法建表（教材对照）');
+{
+  const mem = new MemoryModel();
+  const L = new LinkedListDS(mem, 8);
+  applySteps(mem, L.planBuildHead([10, 20, 30]));
+  assertEq('N-1 头插法建表：顺序与输入相反', chainValues(L, mem), [30, 20, 10]);
+  assertEq('N-2 指针链一致', walkChain(L, mem), [30, 20, 10]);
+  assertEq('N-3 元素个数', L.length, 3);
+  assertEq('N-4 head->next 指向最后头插的结点', mem.read(L.next.get(L.head.id)), 30);
+
+  const mem2 = new MemoryModel();
+  const L2 = new LinkedListDS(mem2, 8);
+  applySteps(mem2, L2.planBuildTail([10, 20, 30]));
+  assertEq('N-5 尾插法建表：保持输入顺序', chainValues(L2, mem2), [10, 20, 30]);
+  assertEq('N-6 指针链一致', walkChain(L2, mem2), [10, 20, 30]);
+  assertEq('N-7 元素个数', L2.length, 3);
+
+  const { mem: m3, L: l3 } = makeList([1, 2]);
+  applySteps(m3, l3.planBuildTail([3, 4]));
+  assertEq('N-8 非空表尾插建表接在表尾', chainValues(l3, m3), [1, 2, 3, 4]);
+
+  const mem4 = new MemoryModel();
+  const L4 = new LinkedListDS(mem4, 2);
+  applySteps(mem4, L4.planBuildHead([1, 2, 3]));
+  assertEq('N-9 建表超过上限时截止在 maxNodes', [chainValues(L4, mem4), L4.length], [[2, 1], 2]);
+}
+
+console.log('\n【用例 O】头插 / 尾插的容量防御');
+{
+  const { L } = makeList([1, 2], 2);
+  assertEq('O-1 未满时头插校验通过', L.insertHeadError(1), null);
+  assertEq('O-2 已满时头插被拦截（双语）',
+    L.insertHeadError(2).zh.includes('演示上限') && L.insertHeadError(2).en.startsWith('Error'), true);
+  assertEq('O-3 已满时尾插被拦截', L.insertTailError(2) !== null, true);
+  assertEq('O-4 已满时头插规划返回空步骤', L.planInsertHead(9).length, 0);
+  assertEq('O-5 已满时尾插规划返回空步骤', L.planInsertTail(9).length, 0);
+  assertEq('O-6 链表结构不变', L.length, 2);
+}
+
+// ============================================================
+// 8. 代码模式与提取
+// ============================================================
+console.log('\n【用例 P】代码模式：insertHead / insertTail / buildHead / buildTail');
+{
+  const mem = new MemoryModel();
+  const L = new LinkedListDS(mem, 8);
+  const p = CommandParser.parse([
+    'int L[8] = {10, 20};',
+    'insertHead(L, 5);',
+    'insertTail(L, 99);',
+    'buildTail(L, 30, 40);',
+  ].join('\n'));
+  const r = CommandParser.buildSteps(L, p.commands, p.declaration);
+  assertEq('P-1 无错误', r.errors.length, 0);
+  applySteps(mem, r.steps);
+  assertEq('P-2 整段执行后的链表', chainValues(L, mem), [5, 10, 20, 99, 30, 40]);
+  assertEq('P-3 指针链一致', walkChain(L, mem), [5, 10, 20, 99, 30, 40]);
+
+  const mem2 = new MemoryModel();
+  const L2 = new LinkedListDS(mem2, 8);
+  const p2 = CommandParser.parse('buildHead(L, 1, 2, 3);');
+  const r2 = CommandParser.buildSteps(L2, p2.commands, null);
+  assertEq('P-4 头插法建表顺序反转', r2.errors.length === 0, true);
+  applySteps(mem2, r2.steps);
+  assertEq('P-5 头插法建表结果', chainValues(L2, mem2), [3, 2, 1]);
+
+  const p3 = CommandParser.parse('insertTail(7);');
+  assertEq('P-6 简写 insertTail', [p3.commands[0].type, p3.commands[0].value], ['insertTail', 7]);
+
+  const small = new LinkedListDS(new MemoryModel(), 3);
+  const pBad = CommandParser.parse('buildTail(L, 1, 2, 3, 4);');
+  const rBad = CommandParser.buildSteps(small, pBad.commands, null);
+  assertEq('P-7 建表超过演示上限报错', rBad.errors.length > 0 && /演示上限/.test(rBad.errors[0].msg.zh), true);
+  assertEq('P-8 超限时不生成步骤', rBad.steps.length, 0);
+
+  const pArr = CommandParser.parse('insertHead(arr, 5);');
+  const rArr = CommandParser.buildSteps({ kind: 'array' }, pArr.commands, null);
+  assertEq('P-9 非链表结构使用头插法报错', rArr.errors.length > 0, true);
+}
+
+console.log('\n【用例 Q】提取指令：insertHead / insertTail / buildHead / buildTail');
+{
+  const ex = Preprocessor.extract([
+    '#include <stdio.h>',
+    'insertHead(L, 5);',
+    'insertTail(L, 99);',
+    'buildHead(L, 10, 20, 30);',
+    'buildTail(L, 1, 2);',
+    'insertHead(7);',
+  ].join('\n'));
+  assertEq('Q-1 提取结果（完整形式 + 简写）', ex.output.split('\n'), [
+    'insertHead(t, 5);',
+    'insertTail(t, 99);',
+    'buildHead(t, 10, 20, 30);',
+    'buildTail(t, 1, 2);',
+    'insertHead(t, 7);',
+  ]);
+  assertEq('Q-2 提取条数', ex.count, 5);
 }
 
 // ---------- 汇总 ----------
