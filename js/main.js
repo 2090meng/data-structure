@@ -52,6 +52,13 @@ const helpBtn = document.getElementById('help-btn');
 const helpDrawer = document.getElementById('help-drawer');
 const noteZh = document.getElementById('note-zh');
 const noteEn = document.getElementById('note-en');
+// 设备选择页与手机端底部面板
+const entryGate = document.getElementById('entry');
+const deviceBtn = document.getElementById('device-btn');
+const gateLang = document.getElementById('gate-lang');
+const sidebar = document.getElementById('sidebar');
+const mobileBar = document.getElementById('mobile-bar');
+const sheetBackdrop = document.getElementById('sheet-backdrop');
 
 // ---------- 3. 创建核心对象 ----------
 let memory = new MemoryModel();
@@ -651,19 +658,26 @@ helpDrawer.querySelectorAll('[data-close]').forEach((el) => {
   el.addEventListener('click', () => setDrawer(false));
 });
 document.addEventListener('keydown', (event) => {
-  if (event.key === 'Escape') setDrawer(false);
+  if (event.key === 'Escape') {
+    setDrawer(false);
+    closeSheets();
+  }
 });
 
 // 底部停靠区：日志 / 代码双标签切换
 const dockTabs = Array.from(document.querySelectorAll('.dock__tab'));
 const dockPanels = Array.from(document.querySelectorAll('.dock__panel'));
+
+/** 选中日志或代码面板（手机端打开面板时也复用它）。 */
+function showDockPanel(name) {
+  for (const t of dockTabs) t.classList.toggle('is-active', t.dataset.panel === name);
+  for (const panel of dockPanels) {
+    panel.hidden = panel.dataset.panel !== name;
+  }
+}
+
 for (const tab of dockTabs) {
-  tab.addEventListener('click', () => {
-    for (const t of dockTabs) t.classList.toggle('is-active', t === tab);
-    for (const panel of dockPanels) {
-      panel.hidden = panel.dataset.panel !== tab.dataset.panel;
-    }
-  });
+  tab.addEventListener('click', () => showDockPanel(tab.dataset.panel));
 }
 
 // 拖拽调整日志 / 代码区高度（默认高度由 CSS 决定，拖动后写入内联像素值）
@@ -711,6 +725,105 @@ if (dock && dockResizer) {
     applyHeight(dock.getBoundingClientRect().height + delta);
   });
 }
+
+// ---------- 8.5 设备选择（电脑端 / 手机端）与手机端底部面板 ----------
+let activeSheet = null;   // 当前展开的底部面板：'ops' | 'log' | 'code'
+
+/** 收起所有手机端底部面板。 */
+function closeSheets() {
+  if (!sidebar || !dock) return;
+  sidebar.classList.remove('is-open');
+  dock.classList.remove('is-open');
+  sheetBackdrop.classList.remove('is-open');
+  document.body.classList.remove('sheet-open');
+  if (mobileBar) {
+    for (const btn of mobileBar.querySelectorAll('.mobile-bar__btn')) {
+      btn.classList.remove('is-active');
+    }
+  }
+  activeSheet = null;
+}
+
+/** 展开指定底部面板；再次点同一个按钮则收起。 */
+function openSheet(name) {
+  if (name === 'help') {
+    closeSheets();
+    setDrawer(true);
+    return;
+  }
+  if (activeSheet === name) {
+    closeSheets();
+    return;
+  }
+  closeSheets();
+
+  if (name === 'ops') {
+    sidebar.classList.add('is-open');
+    sidebar.scrollTop = 0;
+  } else {
+    showDockPanel(name === 'log' ? 'log' : 'code');
+    dock.classList.add('is-open');
+  }
+
+  document.body.classList.add('sheet-open');
+  sheetBackdrop.classList.add('is-open');
+  activeSheet = name;
+  for (const btn of mobileBar.querySelectorAll('.mobile-bar__btn')) {
+    btn.classList.toggle('is-active', btn.dataset.sheet === name);
+  }
+}
+
+/**
+ * 切换电脑 / 手机形态：手机端使用单列布局，操作栏与日志/代码区变为底部面板。
+ * 每次进入都会重新询问，不写入 localStorage。
+ */
+function setDevice(mode) {
+  const mobile = mode === 'mobile';
+  document.body.classList.toggle('mode-mobile', mobile);
+  document.body.classList.toggle('mode-desktop', !mobile);
+  entryGate.classList.remove('is-open');
+  setDrawer(false);
+  closeSheets();
+  dock.style.height = '';   // 清掉桌面端拖拽留下的内联高度
+  requestAnimationFrame(() => {
+    renderer.render(memory);
+    const canvas = document.querySelector('.canvas');
+    if (canvas) {
+      canvas.scrollTop = 0;
+      canvas.scrollLeft = 0;
+    }
+  });
+}
+
+entryGate.addEventListener('click', (event) => {
+  const option = event.target.closest('[data-mode]');
+  if (option) setDevice(option.dataset.mode);
+});
+
+// 右上角「切换设备」重新打开选择页
+deviceBtn.addEventListener('click', () => {
+  setDrawer(false);
+  closeSheets();
+  entryGate.classList.add('is-open');
+});
+
+// 手机端底部操作栏
+mobileBar.addEventListener('click', (event) => {
+  const btn = event.target.closest('[data-sheet]');
+  if (btn) openSheet(btn.dataset.sheet);
+});
+
+// 点遮罩收起底部面板
+sheetBackdrop.addEventListener('click', () => closeSheets());
+
+// 选择页里的语言切换与顶部语言选择保持同步
+gateLang.addEventListener('change', () => {
+  langSelect.value = gateLang.value;
+  i18n.setLang(gateLang.value);
+});
+langSelect.addEventListener('change', () => {
+  gateLang.value = langSelect.value;
+});
 
 // ---------- 9. 初始渲染 ----------
 rebuild(structKind);                     // 默认数组，容量 8

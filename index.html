@@ -42,6 +42,9 @@
     </nav>
 
     <div class="appbar__actions">
+      <button id="device-btn" type="button" class="btn btn--ghost">
+        <span class="zh">切换设备</span><span class="en">Device</span>
+      </button>
       <button id="theme-btn" type="button" class="btn btn--ghost" title="切换深色 / 浅色主题">
         <span class="theme-dot" aria-hidden="true"></span>
         <span class="zh" id="theme-label-zh">浅色</span>
@@ -68,7 +71,7 @@
 
   <main class="workspace">
     <!-- 左侧：操作与播放 -->
-    <aside class="sidebar">
+    <aside class="sidebar" id="sidebar">
       <section class="card">
         <h2 class="card__title">
           <span class="zh">1 · 操作</span><span class="en">1 · Operation</span>
@@ -333,6 +336,85 @@
         </section>
       </div>
     </aside>
+  </div>
+
+  <!-- 手机端底部操作栏（仅在手机模式显示） -->
+  <nav class="mobile-bar" id="mobile-bar" aria-label="移动端操作栏">
+    <button type="button" class="mobile-bar__btn" data-sheet="ops">
+      <span class="zh">操作</span><span class="en">Actions</span>
+    </button>
+    <button type="button" class="mobile-bar__btn" data-sheet="log">
+      <span class="zh">日志</span><span class="en">Log</span>
+    </button>
+    <button type="button" class="mobile-bar__btn" data-sheet="code">
+      <span class="zh">代码</span><span class="en">Code</span>
+    </button>
+    <button type="button" class="mobile-bar__btn" data-sheet="help">
+      <span class="zh">说明</span><span class="en">Help</span>
+    </button>
+  </nav>
+
+  <!-- 抽屉 / 底部面板的遮罩 -->
+  <div class="sheet-backdrop" id="sheet-backdrop"></div>
+
+  <!-- 进入前的设备选择页：每次进入都会询问 -->
+  <div class="gate is-open" id="entry">
+    <div class="gate__panel">
+      <div class="gate__brand">
+        <span class="brand__mark">DS</span>
+        <div>
+          <h1 class="gate__title">
+            <span class="zh">数据结构内存动态演示</span>
+            <span class="en">Data Structure Memory Visualizer</span>
+          </h1>
+          <p class="gate__subtitle">
+            <span class="zh">请选择使用设备，我们会为它适配最佳布局</span>
+            <span class="en">Choose your device — the layout adapts to it</span>
+          </p>
+        </div>
+      </div>
+
+      <div class="gate__options">
+        <button type="button" class="gate__option" data-mode="desktop">
+          <span class="gate__visual gate__visual--desktop" aria-hidden="true"></span>
+          <span class="gate__option-title">
+            <span class="zh">电脑端</span><span class="en">Desktop</span>
+          </span>
+          <span class="gate__option-desc">
+            <span class="zh">宽屏工作台：左侧操作、中间画布、底部日志与代码</span>
+            <span class="en">Wide workbench: actions at left, canvas in the middle, log &amp; code below</span>
+          </span>
+          <span class="gate__option-cta">
+            <span class="zh">进入电脑端</span><span class="en">Enter desktop</span>
+          </span>
+        </button>
+
+        <button type="button" class="gate__option" data-mode="mobile">
+          <span class="gate__visual gate__visual--mobile" aria-hidden="true"></span>
+          <span class="gate__option-title">
+            <span class="zh">手机端</span><span class="en">Mobile</span>
+          </span>
+          <span class="gate__option-desc">
+            <span class="zh">App 式单列：顶部结构标签、全宽画布、底部操作栏与抽屉</span>
+            <span class="en">App-style single column: structure tabs on top, full-width canvas, bottom bar &amp; sheets</span>
+          </span>
+          <span class="gate__option-cta">
+            <span class="zh">进入手机端</span><span class="en">Enter mobile</span>
+          </span>
+        </button>
+      </div>
+
+      <div class="gate__foot">
+        <span class="gate__foot-text">
+          <span class="zh">每次进入都会询问；进入后可用右上角「切换设备」重新选择</span>
+          <span class="en">Asked on every visit; use “Device” in the top bar to switch later</span>
+        </span>
+        <select id="gate-lang" aria-label="Language">
+          <option value="zh">中文</option>
+          <option value="en">English</option>
+        </select>
+      </div>
+    </div>
   </div>
 
   <script type="module" src="js/main.js"></script>
