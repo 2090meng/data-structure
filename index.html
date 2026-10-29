@@ -165,7 +165,15 @@
         <svg id="memory-svg" xmlns="http://www.w3.org/2000/svg"></svg>
       </div>
 
-      <section class="dock">
+      <section class="dock" id="dock">
+        <div
+          class="dock__resizer"
+          id="dock-resizer"
+          role="separator"
+          aria-orientation="horizontal"
+          tabindex="0"
+          title="拖动调整日志 / 代码区高度"
+        ></div>
         <div class="dock__tabs" id="dock-tabs">
           <button type="button" class="dock__tab is-active" data-panel="log">
             <span class="zh">执行日志</span><span class="en">Log</span>

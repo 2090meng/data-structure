@@ -394,7 +394,8 @@ select:focus, input:focus, textarea:focus {
 
 /* 底部停靠区：日志 / 代码双标签 */
 .dock {
-  height: 216px;
+  height: clamp(250px, 32vh, 460px);
+  min-height: 140px;
   display: flex;
   flex-direction: column;
   background: var(--panel-bg);
@@ -402,6 +403,40 @@ select:focus, input:focus, textarea:focus {
   border-radius: var(--radius);
   overflow: hidden;
   box-shadow: var(--shadow);
+  flex-shrink: 0;
+}
+
+/* 顶部拖拽条：上下拖动可调整日志 / 代码区高度 */
+.dock__resizer {
+  height: 9px;
+  flex-shrink: 0;
+  cursor: ns-resize;
+  touch-action: none;
+  position: relative;
+  background: transparent;
+}
+
+.dock__resizer::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: 3px;
+  width: 44px;
+  height: 3px;
+  margin-left: -22px;
+  border-radius: 2px;
+  background: var(--border);
+  transition: background 0.15s ease;
+}
+
+.dock__resizer:hover::after,
+.dock__resizer:focus-visible::after {
+  background: var(--accent);
+}
+
+body.is-resizing {
+  cursor: ns-resize;
+  user-select: none;
 }
 
 .dock__tabs {
@@ -458,8 +493,8 @@ select:focus, input:focus, textarea:focus {
   margin: 0;
   padding: 8px 14px;
   overflow-y: auto;
-  font-size: 12.5px;
-  line-height: 1.75;
+  font-size: 13.5px;
+  line-height: 1.8;
   font-family: "Consolas", "Courier New", monospace;
 }
 
@@ -500,7 +535,7 @@ select:focus, input:focus, textarea:focus {
 }
 
 .code-pane__label {
-  font-size: 11px;
+  font-size: 12px;
   color: var(--text-dim);
 }
 
@@ -509,21 +544,21 @@ select:focus, input:focus, textarea:focus {
   min-height: 0;
   resize: none;
   font-family: "Consolas", "Courier New", monospace;
-  font-size: 12px;
-  line-height: 1.6;
+  font-size: 13.5px;
+  line-height: 1.75;
 }
 
 .code-view {
   flex: 1;
   min-height: 0;
   overflow: auto;
-  padding: 5px 0;
+  padding: 6px 0;
   background: var(--field-bg);
   border: 1px solid var(--border);
   border-radius: 9px;
   font-family: "Consolas", "Courier New", monospace;
-  font-size: 12px;
-  line-height: 1.6;
+  font-size: 13.5px;
+  line-height: 1.75;
 }
 
 .code-line {
@@ -880,7 +915,7 @@ body.lang-en .zh { display: none; }
   }
 
   .dock {
-    height: 320px;
+    height: clamp(260px, 42vh, 440px);
   }
 
   .code-pane {

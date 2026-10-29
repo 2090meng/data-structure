@@ -666,6 +666,52 @@ for (const tab of dockTabs) {
   });
 }
 
+// 拖拽调整日志 / 代码区高度（默认高度由 CSS 决定，拖动后写入内联像素值）
+const dock = document.getElementById('dock');
+const dockResizer = document.getElementById('dock-resizer');
+if (dock && dockResizer) {
+  const stage = dock.parentElement;
+  let dragging = false;
+  let startY = 0;
+  let startH = 0;
+
+  const maxHeight = () => Math.max(160, stage.clientHeight - 240);
+  const applyHeight = (height) => {
+    const h = Math.min(Math.max(height, 140), maxHeight());
+    dock.style.height = `${Math.round(h)}px`;
+  };
+
+  dockResizer.addEventListener('pointerdown', (event) => {
+    dragging = true;
+    startY = event.clientY;
+    startH = dock.getBoundingClientRect().height;
+    dockResizer.setPointerCapture(event.pointerId);
+    document.body.classList.add('is-resizing');
+    event.preventDefault();
+  });
+
+  dockResizer.addEventListener('pointermove', (event) => {
+    if (!dragging) return;
+    applyHeight(startH - (event.clientY - startY));
+  });
+
+  const endDrag = () => {
+    if (!dragging) return;
+    dragging = false;
+    document.body.classList.remove('is-resizing');
+  };
+  dockResizer.addEventListener('pointerup', endDrag);
+  dockResizer.addEventListener('pointercancel', endDrag);
+
+  // 键盘也可调整：上下方向键每次 24px
+  dockResizer.addEventListener('keydown', (event) => {
+    if (event.key !== 'ArrowUp' && event.key !== 'ArrowDown') return;
+    event.preventDefault();
+    const delta = event.key === 'ArrowUp' ? 24 : -24;
+    applyHeight(dock.getBoundingClientRect().height + delta);
+  });
+}
+
 // ---------- 9. 初始渲染 ----------
 rebuild(structKind);                     // 默认数组，容量 8
 syncOps();
