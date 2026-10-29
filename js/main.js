@@ -43,6 +43,15 @@ const runCodeBtn = document.getElementById('run-code-btn');
 const extractBtn = document.getElementById('extract-btn');
 const codeView = document.getElementById('code-view');
 const speedSelect = document.getElementById('speed-select');
+// 新版界面外壳：顶部结构标签 / 主题切换 / 说明抽屉 / 底部停靠区
+const structureTabs = document.getElementById('structure-tabs');
+const themeBtn = document.getElementById('theme-btn');
+const themeLabelZh = document.getElementById('theme-label-zh');
+const themeLabelEn = document.getElementById('theme-label-en');
+const helpBtn = document.getElementById('help-btn');
+const helpDrawer = document.getElementById('help-drawer');
+const noteZh = document.getElementById('note-zh');
+const noteEn = document.getElementById('note-en');
 
 // ---------- 3. 创建核心对象 ----------
 let memory = new MemoryModel();
@@ -303,6 +312,64 @@ function switchStructure(kind) {
   syncCodeView();
   clearLog();
   setActiveLine(null);
+  syncStructureChrome(kind);
+}
+
+// ---------- 5.5 界面外壳：结构标签 / 结构说明 / 主题 / 说明抽屉 ----------
+// 每个结构在舞台标题下的一句话说明（新增结构时只需在这里补一条）。
+const STRUCT_NOTE = {
+  array: {
+    zh: '顺序存储：地址连续，插入删除需要移动元素',
+    en: 'Sequential storage: contiguous addresses, insert/delete shifts elements',
+  },
+  linked: {
+    zh: '链式存储：结点分散，靠 next 指针串成一条链',
+    en: 'Linked storage: scattered nodes chained by next pointers',
+  },
+  stack: {
+    zh: '后进先出：top 指向栈顶的下一个空位',
+    en: 'LIFO: top points to the next free slot',
+  },
+  queue: {
+    zh: '先进先出：循环队列，牺牲一个单元区分队空/队满',
+    en: 'FIFO: circular queue, one slot sacrificed to distinguish empty/full',
+  },
+  binarytree: {
+    zh: '二叉链表：lchild / rchild 指针，按层序编号定位结点',
+    en: 'Linked binary tree: lchild/rchild pointers, level-order node numbering',
+  },
+};
+
+/** 同步顶部结构标签的选中态与舞台的结构说明。 */
+function syncStructureChrome(kind) {
+  if (structureTabs) {
+    for (const tab of structureTabs.querySelectorAll('[data-structure]')) {
+      tab.classList.toggle('is-active', tab.dataset.structure === kind);
+    }
+  }
+  const note = STRUCT_NOTE[kind] || { zh: '', en: '' };
+  if (noteZh) noteZh.textContent = note.zh;
+  if (noteEn) noteEn.textContent = note.en;
+}
+
+/** 应用深色 / 浅色主题（按钮文案显示“将要切换到”的主题）。 */
+function applyTheme(light) {
+  document.body.classList.toggle('theme-light', light);
+  if (themeLabelZh) themeLabelZh.textContent = light ? '深色' : '浅色';
+  if (themeLabelEn) themeLabelEn.textContent = light ? 'Dark' : 'Light';
+  if (themeBtn) themeBtn.setAttribute('aria-pressed', String(light));
+  try {
+    localStorage.setItem('ds-theme', light ? 'light' : 'dark');
+  } catch (_) {
+    // 隐私模式或 file:// 下可能不可用，忽略即可
+  }
+}
+
+/** 打开 / 关闭「说明与指令速查」抽屉。 */
+function setDrawer(open) {
+  if (!helpDrawer) return;
+  helpDrawer.classList.toggle('is-open', open);
+  helpDrawer.setAttribute('aria-hidden', String(!open));
 }
 
 // ---------- 6. 执行操作 ----------
@@ -563,6 +630,42 @@ structureSelect.addEventListener('change', () => switchStructure(structureSelect
 langSelect.addEventListener('change', () => i18n.setLang(langSelect.value));
 speedSelect.addEventListener('change', () => animator.setSpeed(SPEED_MAP[speedSelect.value]));
 
+// 顶部结构标签：切换结构，同时同步隐藏的 select（保持单一状态源）
+structureTabs.addEventListener('click', (event) => {
+  const tab = event.target.closest('[data-structure]');
+  if (!tab || !structureTabs.contains(tab)) return;
+  const kind = tab.dataset.structure;
+  if (kind === structKind) return;
+  structureSelect.value = kind;
+  switchStructure(kind);
+});
+
+// 主题切换：切换后记住选择，下次打开沿用
+themeBtn.addEventListener('click', () => {
+  applyTheme(!document.body.classList.contains('theme-light'));
+});
+
+// 说明抽屉：按钮打开；遮罩、关闭按钮、Esc 关闭
+helpBtn.addEventListener('click', () => setDrawer(true));
+helpDrawer.querySelectorAll('[data-close]').forEach((el) => {
+  el.addEventListener('click', () => setDrawer(false));
+});
+document.addEventListener('keydown', (event) => {
+  if (event.key === 'Escape') setDrawer(false);
+});
+
+// 底部停靠区：日志 / 代码双标签切换
+const dockTabs = Array.from(document.querySelectorAll('.dock__tab'));
+const dockPanels = Array.from(document.querySelectorAll('.dock__panel'));
+for (const tab of dockTabs) {
+  tab.addEventListener('click', () => {
+    for (const t of dockTabs) t.classList.toggle('is-active', t === tab);
+    for (const panel of dockPanels) {
+      panel.hidden = panel.dataset.panel !== tab.dataset.panel;
+    }
+  });
+}
+
 // ---------- 9. 初始渲染 ----------
 rebuild(structKind);                     // 默认数组，容量 8
 syncOps();
@@ -570,9 +673,13 @@ codeInput.value = SAMPLES.array;         // 预填 C 风格示例代码
 syncCodeView();
 animator.setSpeed(SPEED_MAP[speedSelect.value]);
 renderer.render(memory);
+syncStructureChrome(structKind);
 
-// 手机上默认折叠「使用说明」，避免首屏被说明占满
-const helpBox = document.querySelector('.panel__help');
-if (helpBox && window.matchMedia('(max-width: 900px)').matches) {
-  helpBox.open = false;
+// 恢复上次选择的主题（默认深色）
+let savedTheme = 'dark';
+try {
+  savedTheme = localStorage.getItem('ds-theme') || 'dark';
+} catch (_) {
+  // 隐私模式或 file:// 下可能不可用，忽略即可
 }
+applyTheme(savedTheme === 'light');

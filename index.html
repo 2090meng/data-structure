@@ -7,147 +7,124 @@
   <link rel="stylesheet" href="css/style.css" />
 </head>
 <body>
-  <!-- 顶部标题栏 -->
-  <header class="topbar">
-    <h1 class="title">
-      <span class="zh">数据结构内存动态演示</span>
-      <span class="en">Data Structure Memory Visualizer</span>
-    </h1>
-    <div class="toolbar">
-      <label class="toolbar__label zh" for="lang-select">语言</label>
-      <label class="toolbar__label en" for="lang-select">Language</label>
-      <select id="lang-select">
+  <!-- 顶部应用栏：品牌 / 结构标签 / 工具 / 语言 -->
+  <header class="appbar">
+    <div class="brand">
+      <span class="brand__mark">DS</span>
+      <div class="brand__text">
+        <h1 class="brand__title">
+          <span class="zh">数据结构内存动态演示</span>
+          <span class="en">Data Structure Memory Visualizer</span>
+        </h1>
+        <p class="brand__subtitle">
+          <span class="zh">按考研教材语义，逐步演示内存与指针变化</span>
+          <span class="en">Textbook-faithful, step-by-step memory &amp; pointer animation</span>
+        </p>
+      </div>
+    </div>
+
+    <nav class="tabs" id="structure-tabs" aria-label="数据结构">
+      <button type="button" class="tabs__item is-active" data-structure="array">
+        <span class="zh">数组</span><span class="en">Array</span>
+      </button>
+      <button type="button" class="tabs__item" data-structure="linked">
+        <span class="zh">链表</span><span class="en">Linked List</span>
+      </button>
+      <button type="button" class="tabs__item" data-structure="stack">
+        <span class="zh">栈</span><span class="en">Stack</span>
+      </button>
+      <button type="button" class="tabs__item" data-structure="queue">
+        <span class="zh">队列</span><span class="en">Queue</span>
+      </button>
+      <button type="button" class="tabs__item" data-structure="binarytree">
+        <span class="zh">二叉树</span><span class="en">Binary Tree</span>
+      </button>
+    </nav>
+
+    <div class="appbar__actions">
+      <button id="theme-btn" type="button" class="btn btn--ghost" title="切换深色 / 浅色主题">
+        <span class="theme-dot" aria-hidden="true"></span>
+        <span class="zh" id="theme-label-zh">浅色</span>
+        <span class="en" id="theme-label-en">Light</span>
+      </button>
+      <button id="help-btn" type="button" class="btn btn--ghost">
+        <span class="zh">说明与速查</span><span class="en">Help</span>
+      </button>
+      <select id="lang-select" aria-label="Language">
         <option value="zh">中文</option>
         <option value="en">English</option>
       </select>
     </div>
+
+    <!-- 兼容脚本的结构选择器（由顶部标签驱动，界面不直接展示） -->
+    <select id="structure-select" hidden>
+      <option value="array">数组 Array</option>
+      <option value="linked">链表 Linked List</option>
+      <option value="stack">栈 Stack</option>
+      <option value="queue">队列 Queue</option>
+      <option value="binarytree">二叉树 Binary Tree</option>
+    </select>
   </header>
 
-  <main class="layout">
-    <!-- 左侧：操作面板 -->
-    <aside class="panel">
-      <details class="panel__help" open>
-        <summary>
-          <span class="zh">使用说明（第一次请先看这里）</span>
-          <span class="en">How to use (read this first)</span>
-        </summary>
-        <ol class="help-list">
-          <li><span class="zh">先在右上角选择语言。</span><span class="en">Pick a language at the top-right.</span></li>
-          <li><span class="zh">在左侧选择数据结构：数组 Array、链表 Linked List、栈 Stack、队列 Queue、二叉树 Binary Tree（切换结构会重置内存并载入对应示例代码）。</span><span class="en">Choose a data structure: Array, Linked List, Stack, Queue or Binary Tree (switching rebuilds the memory and loads a matching sample).</span></li>
-          <li><span class="zh">选择操作：数组为插入/删除/修改/查找；链表为插入/删除/查找/头插法/尾插法；栈为入栈/出栈/取栈顶/查找；队列为入队/出队/查看队头/查找；二叉树为插入左/右孩子、删除子树、查找、先序/中序/后序/层次遍历。</span><span class="en">Pick an operation: array = insert/delete/set/search; linked list = insert/delete/search/head-insert/tail-insert; stack = push/pop/peek/search; queue = enqueue/dequeue/front/search; binary tree = insert left/right child, delete subtree, search, preorder/inorder/postorder/level-order traversal.</span></li>
-          <li><span class="zh">填参数：插入/删除/修改填「位序」（按考研教材从 1 开始；插入可取 1..length+1，删除/修改可取 1..length），插入/修改/查找/入栈/入队填「值」（栈和队列不需要填位序；链表的头插法/尾插法只需填「值」，无需位序）；二叉树的插入左/右孩子填「父结点位序」与「值」，删除填「子树根结点位序」，遍历无需输入。</span><span class="en">Fill parameters: position for insert/delete/set (1-based per textbook; insert allows 1..length+1, delete/set allows 1..length), value for insert/set/search/push/enqueue (stack and queue need no position); for the binary tree, insert left/right takes the parent index and value, delete takes the subtree root index, traversal needs no input.</span></li>
-          <li><span class="zh">指针语义按教材：栈的 <code>top</code> 指向栈顶元素的下一个空位（入栈先写入 <code>S.data[S.top]</code>，再 <code>S.top++</code>；出栈先 <code>S.top--</code>，再取数据）；队列为循环队列且牺牲一个单元（<code>rear</code> 指向队尾的下一个空位，<code>front==rear</code> 为空，<code>(rear+1)%MaxSize==front</code> 为满，最多存 MaxSize-1 个）。</span><span class="en">Pointer conventions follow the textbook: stack <code>top</code> points to the next free slot (push writes <code>S.data[S.top]</code> then <code>S.top++</code>; pop does <code>S.top--</code> then reads); queue is a circular queue sacrificing one slot (<code>rear</code> points to the slot after the last element, empty when <code>front==rear</code>, full when <code>(rear+1)%MaxSize==front</code>, storing at most MaxSize-1).</span></li>
-          <li><span class="zh">链表为【带头结点】的单链表：<code>head</code> 指向头结点，块内左栏是 <code>data</code>、右栏是 <code>next</code>（后继结点地址或 NULL），块间箭头就是 next 指针；每个结点单独分配，所以地址不连续。插入先 <code>s-&gt;next = p-&gt;next</code> 再 <code>p-&gt;next = s</code>；删除时 <code>p-&gt;next = q-&gt;next</code> 后结点被摘链，内存不回收，灰显在行尾。头插法：<code>s-&gt;next = L-&gt;next; L-&gt;next = s;</code>，新结点直接成为第 1 个结点（O(1)），连续头插会得到与输入相反的顺序；尾插法：<code>p = L; while (p-&gt;next) p = p-&gt;next; s-&gt;next = NULL; p-&gt;next = s;</code>，先找表尾再挂接（O(n)），顺序与输入一致。代码模式还可用 <code>buildHead / buildTail</code> 按序列建表。</span><span class="en">The linked list has a head node: <code>head</code> points to it, each block shows <code>data</code> and <code>next</code> (address of the successor or NULL), and arrows are the next pointers; nodes are allocated separately, so addresses are non-contiguous. Insert does <code>s-&gt;next = p-&gt;next</code> then <code>p-&gt;next = s</code>; delete does <code>p-&gt;next = q-&gt;next</code>, the node is unlinked but its memory is kept (shown greyed at the end). Head insert: <code>s-&gt;next = L-&gt;next; L-&gt;next = s;</code> makes the new node the 1st one in O(1), so repeated head inserts reverse the input order; tail insert: <code>p = L; while (p-&gt;next) p = p-&gt;next; s-&gt;next = NULL; p-&gt;next = s;</code> walks to the last node first (O(n)) and keeps the input order. Code mode also supports <code>buildHead / buildTail</code> to build a list from a sequence.</span></li>
-          <li><span class="zh">二叉树为【二叉链表】：每个结点单独分配（地址不连续），块间的箭头表示 <code>lchild / rchild</code> 指针。结点按【层序编号】定位：根为第 1 号，第 i 号的左孩子为 2i、右孩子为 2i+1。空树时“插入左/右孩子”会建立根结点；删除会移除以该结点为根的整棵子树（内存不回收，灰显在下方）。查找按先序逐个比较，遍历按先序/中序/后序/层次输出访问序列。</span><span class="en">The binary tree uses a linked representation: every node is allocated separately (non-contiguous addresses), and the arrows are <code>lchild / rchild</code> pointers. Nodes are addressed by level-order numbering: root = 1, left child of node i = 2i, right child = 2i+1. When the tree is empty, Insert Left/Right creates the root; Delete removes the whole subtree rooted at that node (memory is kept and greyed below). Search compares nodes in preorder; traversals output the preorder/inorder/postorder/level-order sequence.</span></li>
-          <li><span class="zh">点「执行」立即运行动画查看结果；代码模式点「运行代码」后，用「单步执行」逐行或「自动播放」连续播放。</span><span class="en">Click "Execute" to run the animation right away; in code mode, click "Run Code" then "Step" line by line or "Play" to auto-run.</span></li>
-          <li><span class="zh">也可在「代码驱动」区输入伪代码，点「运行代码」后逐行高亮执行，右侧内存同步变化。</span><span class="en">Or type pseudo-code in the code area and click "Run Code" — it highlights each line while the memory updates.</span></li>
-          <li><span class="zh">若粘贴的是完整 C 代码，先点「提取指令」：它会自动过滤 #include、printf、for/while/if 等无关代码，只保留初始化、赋值、插入、删除、交换、查找、入栈出栈、入队出队等可演示操作，并把清洗后的指令回填到输入框；再点「运行代码」即可演示。</span><span class="en">If you paste full C code, click "Extract" first: it strips #include, printf, for/while/if and other irrelevant code, keeps only demonstrable operations (init, assignment, insert, remove, swap, search, push/pop, enqueue/dequeue), and writes the cleaned commands back into the box; then click "Run Code" to play.</span></li>
-          <li><span class="zh">观察右侧内存块的地址与值变化，配合下方日志理解每一步。</span><span class="en">Watch the memory block addresses/values on the right, with the log below.</span></li>
-          <li><span class="zh">点「重置」清空并恢复初始状态。</span><span class="en">Click "Reset" to clear and restart.</span></li>
-        </ol>
-      </details>
-
-      <section class="panel__section">
-        <h2 class="panel__title zh">1. 选择数据结构</h2>
-        <h2 class="panel__title en">1. Choose data structure</h2>
-        <select id="structure-select">
-          <option value="array">数组 Array</option>
-          <option value="linked">链表 Linked List</option>
-          <option value="stack">栈 Stack</option>
-          <option value="queue">队列 Queue</option>
-          <option value="binarytree">二叉树 Binary Tree</option>
-        </select>
-      </section>
-
-      <section class="panel__section">
-        <h2 class="panel__title zh">2. 输入操作</h2>
-        <h2 class="panel__title en">2. Operation</h2>
+  <main class="workspace">
+    <!-- 左侧：操作与播放 -->
+    <aside class="sidebar">
+      <section class="card">
+        <h2 class="card__title">
+          <span class="zh">1 · 操作</span><span class="en">1 · Operation</span>
+        </h2>
 
         <div class="field">
-          <label class="field__label zh" for="op-select">操作</label>
-          <label class="field__label en" for="op-select">Operation</label>
-          <select id="op-select">
-            <option value="insert">插入 Insert</option>
-            <option value="delete">删除 Delete</option>
-            <option value="set">修改/赋值 Set</option>
-            <option value="search">查找 Search</option>
-          </select>
+          <label class="field__label" for="op-select">
+            <span class="zh">操作类型</span><span class="en">Action</span>
+          </label>
+          <select id="op-select"></select>
         </div>
 
         <div class="field" id="index-field">
-          <label class="field__label zh" for="index-input">位序 position（从 1 开始）</label>
-          <label class="field__label en" for="index-input">Position (1-based)</label>
+          <label class="field__label" for="index-input">
+            <span class="zh">位序 position（从 1 开始）</span>
+            <span class="en">Position (1-based)</span>
+          </label>
           <input id="index-input" type="number" min="1" value="1" />
         </div>
 
         <div class="field" id="value-field">
-          <label class="field__label zh" for="value-input">值 value</label>
-          <label class="field__label en" for="value-input">Value</label>
+          <label class="field__label" for="value-input">
+            <span class="zh">值 value</span><span class="en">Value</span>
+          </label>
           <input id="value-input" type="number" value="1" />
         </div>
 
-        <button id="execute-btn" class="btn btn--primary">
+        <button id="execute-btn" type="button" class="btn btn--primary btn--wide">
           <span class="zh">执行</span><span class="en">Execute</span>
         </button>
       </section>
 
-      <section class="panel__section">
-        <h2 class="panel__title zh">3. 代码驱动（高级）</h2>
-        <h2 class="panel__title en">3. Code-driven (advanced)</h2>
-        <textarea id="code-input" class="code-input" spellcheck="false"></textarea>
-        <div id="code-view" class="code-view"></div>
-        <div class="code-hint zh">
-          支持 C/C++ 风格（大小写不敏感，<code>//</code> 注释，<code>;</code> 分隔；<code>#include</code>、<code>printf</code>、<code>for</code> 等会被忽略）：
-          <code>int arr[10] = {10, 20, 5};</code> 声明并初始化；
-          <code>arr[1] = 20;</code> 修改（C 物理下标，0 起始）；<code>insert(arr, 2, 5);</code> 在第 2 个位置插入（位序 1 起始）；
-          <code>push(arr, 7);</code> 入栈；<code>pop(arr);</code> 出栈；
-          <code>enqueue(q, 7);</code> 入队；<code>dequeue(q);</code> 出队；
-          <code>remove(arr, 1);</code> 删除第 1 个（位序）；<code>search(arr, 5);</code> 查找；
-          链表同样用位序：<code>insert(L, 1, 5);</code> 插到头结点之后，<code>remove(L, 2);</code> 删除第 2 个结点；头插法 <code>insertHead(L, 5);</code>、尾插法 <code>insertTail(L, 99);</code>，按序列建表 <code>buildHead(L, 10, 20, 30);</code>（结果 30→20→10）/ <code>buildTail(L, 10, 20, 30);</code>（结果 10→20→30）；
-          二叉树按层序编号：<code>int T[15] = {10, 20, 30};</code> 按层序建树，<code>insertLeft(T, 2, 5);</code> 给第 2 号结点挂左孩子，<code>insertRight(T, 2, 6);</code> 挂右孩子，<code>remove(T, 2);</code> 删除子树，<code>preorder(T); / inorder(T); / postorder(T); / levelorder(T);</code> 四种遍历；
-          简写可省略变量名：<code>set(2, 99);</code>（物理下标）、<code>insert(2, 99);</code>（位序）、<code>remove(1);</code>（位序）、<code>swap(1, 3);</code>（物理下标）。
-        </div>
-        <div class="code-hint en">
-          C/C++-style (case-insensitive, <code>//</code> comments, <code>;</code> separator; <code>#include</code>, <code>printf</code>, <code>for</code> etc. are ignored):
-          <code>int arr[10] = {10, 20, 5};</code> declare &amp; initialize;
-          <code>arr[1] = 20;</code> set (C physical index, 0-based); <code>insert(arr, 2, 5);</code> insert at position 2 (1-based);
-          <code>push(arr, 7);</code> push; <code>pop(arr);</code> pop;
-          <code>enqueue(q, 7);</code> enqueue; <code>dequeue(q);</code> dequeue;
-          <code>remove(arr, 1);</code> delete element 1 (1-based); <code>search(arr, 5);</code> search;
-          linked list also uses 1-based positions: <code>insert(L, 1, 5);</code> inserts after the head node, <code>remove(L, 2);</code> deletes node 2; head insert <code>insertHead(L, 5);</code>, tail insert <code>insertTail(L, 99);</code>, build from a sequence <code>buildHead(L, 10, 20, 30);</code> (yields 30→20→10) / <code>buildTail(L, 10, 20, 30);</code> (yields 10→20→30);
-          binary tree uses level-order numbering: <code>int T[15] = {10, 20, 30};</code> builds by level order, <code>insertLeft(T, 2, 5);</code> attaches a left child to node 2, <code>insertRight(T, 2, 6);</code> a right child, <code>remove(T, 2);</code> deletes the subtree, <code>preorder(T); / inorder(T); / postorder(T); / levelorder(T);</code> four traversals;
-          shorthand (variable omitted): <code>set(2, 99);</code> (physical index), <code>insert(2, 99);</code> (position), <code>remove(1);</code> (position), <code>swap(1, 3);</code> (physical index).
-        </div>
-        <div class="btn-group">
-          <button id="run-code-btn" class="btn btn--primary">
-            <span class="zh">运行代码</span><span class="en">Run Code</span>
-          </button>
-          <button id="extract-btn" class="btn">
-            <span class="zh">提取指令</span><span class="en">Extract</span>
-          </button>
-        </div>
-      </section>
+      <section class="card">
+        <h2 class="card__title">
+          <span class="zh">2 · 播放控制</span><span class="en">2 · Playback</span>
+        </h2>
 
-      <section class="panel__section">
-        <h2 class="panel__title zh">4. 播放控制</h2>
-        <h2 class="panel__title en">4. Playback</h2>
-        <div class="btn-group">
-          <button id="step-back-btn" class="btn">
-            <span class="zh">上一步</span><span class="en">Step Back</span>
+        <div class="grid-2">
+          <button id="step-back-btn" type="button" class="btn">
+            <span class="zh">上一步</span><span class="en">Back</span>
           </button>
-          <button id="step-btn" class="btn">
+          <button id="step-btn" type="button" class="btn">
             <span class="zh">单步执行</span><span class="en">Step</span>
           </button>
-          <button id="play-btn" class="btn">
+          <button id="play-btn" type="button" class="btn">
             <span class="zh">自动播放</span><span class="en">Play</span>
           </button>
-          <button id="reset-btn" class="btn btn--danger">
+          <button id="reset-btn" type="button" class="btn btn--danger">
             <span class="zh">重置</span><span class="en">Reset</span>
           </button>
         </div>
+
         <div class="field">
-          <label class="field__label zh" for="speed-select">速度</label>
-          <label class="field__label en" for="speed-select">Speed</label>
+          <label class="field__label" for="speed-select">
+            <span class="zh">速度</span><span class="en">Speed</span>
+          </label>
           <select id="speed-select">
             <option value="slow">慢速 Slow (800ms)</option>
             <option value="normal" selected>正常 Normal (400ms)</option>
@@ -157,33 +134,198 @@
         </div>
       </section>
 
-      <section class="panel__section panel__legend">
-        <h2 class="panel__title zh">图例</h2>
-        <h2 class="panel__title en">Legend</h2>
-        <ul class="legend">
-          <li><span class="swatch swatch--alloc"></span><span class="zh">已分配内存（存储元素）</span><span class="en">Allocated memory</span></li>
-          <li><span class="swatch swatch--free"></span><span class="zh">空闲内存</span><span class="en">Free memory</span></li>
-          <li><span class="swatch swatch--hl"></span><span class="zh">当前操作位置</span><span class="en">Current operation</span></li>
-          <li><span class="swatch swatch--freed"></span><span class="zh">已删除（内存未回收）</span><span class="en">Deleted (memory kept)</span></li>
-          <li><span class="swatch swatch--ptr"></span><span class="zh">结构指针（top / front / rear / head / next / lchild / rchild 箭头）</span><span class="en">Structure pointer (top / front / rear / head / next / lchild / rchild arrow)</span></li>
-        </ul>
+      <section class="card card--tip">
+        <h2 class="card__title">
+          <span class="zh">小提示</span><span class="en">Tip</span>
+        </h2>
+        <p class="tip-text zh">点「执行」生成步骤，再用「单步 / 播放 / 上一步」观察过程；代码驱动见下方「代码」标签页。</p>
+        <p class="tip-text en">Click "Execute" to generate steps, then use Step / Play / Back to inspect; code-driven mode lives in the "Code" tab below.</p>
       </section>
     </aside>
 
-    <!-- 右侧：内存可视化 + 日志 -->
-    <section class="visual">
-      <div class="visual__canvas">
+    <!-- 右侧：内存舞台 + 底部日志/代码停靠区 -->
+    <section class="stage">
+      <header class="stage__head">
+        <div>
+          <h2 class="stage__title">
+            <span class="zh">内存视图</span><span class="en">Memory view</span>
+          </h2>
+          <p class="stage__note">
+            <span class="zh" id="note-zh"></span>
+            <span class="en" id="note-en"></span>
+          </p>
+        </div>
+        <div class="stage__hint">
+          <span class="zh">地址与指针随动画实时变化</span>
+          <span class="en">Addresses &amp; pointers update live</span>
+        </div>
+      </header>
+
+      <div class="canvas">
         <svg id="memory-svg" xmlns="http://www.w3.org/2000/svg"></svg>
       </div>
-      <div class="log">
-        <div class="log__header">
-          <span class="zh">执行日志</span>
-          <span class="en">Execution Log</span>
+
+      <section class="dock">
+        <div class="dock__tabs" id="dock-tabs">
+          <button type="button" class="dock__tab is-active" data-panel="log">
+            <span class="zh">执行日志</span><span class="en">Log</span>
+          </button>
+          <button type="button" class="dock__tab" data-panel="code">
+            <span class="zh">代码驱动</span><span class="en">Code</span>
+          </button>
         </div>
-        <ul id="log-list"></ul>
-      </div>
+
+        <div class="dock__body">
+          <div class="dock__panel" data-panel="log">
+            <ul id="log-list"></ul>
+          </div>
+
+          <div class="dock__panel" data-panel="code" hidden>
+            <div class="code-pane">
+              <div class="code-pane__col">
+                <span class="code-pane__label zh">输入伪代码 / C 代码</span>
+                <span class="code-pane__label en">Pseudo-code / C code</span>
+                <textarea id="code-input" class="code-input" spellcheck="false"></textarea>
+              </div>
+
+              <div class="code-pane__col">
+                <span class="code-pane__label zh">执行高亮</span>
+                <span class="code-pane__label en">Execution highlight</span>
+                <div id="code-view" class="code-view"></div>
+              </div>
+
+              <div class="code-pane__actions">
+                <button id="run-code-btn" type="button" class="btn btn--primary">
+                  <span class="zh">运行代码</span><span class="en">Run Code</span>
+                </button>
+                <button id="extract-btn" type="button" class="btn">
+                  <span class="zh">提取指令</span><span class="en">Extract</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
     </section>
   </main>
+
+  <!-- 说明与指令速查抽屉 -->
+  <div class="drawer" id="help-drawer" aria-hidden="true">
+    <div class="drawer__overlay" data-close></div>
+    <aside class="drawer__panel" role="dialog" aria-modal="true" aria-label="说明与指令速查">
+      <header class="drawer__head">
+        <h2>
+          <span class="zh">说明与指令速查</span><span class="en">Help &amp; Cheat sheet</span>
+        </h2>
+        <button type="button" class="btn btn--ghost" data-close>
+          <span class="zh">关闭</span><span class="en">Close</span>
+        </button>
+      </header>
+
+      <div class="drawer__body">
+        <section class="help-block">
+          <h3><span class="zh">快速上手</span><span class="en">Quick start</span></h3>
+          <ol class="help-list">
+            <li>
+              <span class="zh">在顶部标签选择结构，左侧选择操作并填参数，点「执行」。</span>
+              <span class="en">Pick a structure tab, choose an action and fill in the parameters, then click Execute.</span>
+            </li>
+            <li>
+              <span class="zh">用「单步执行 / 自动播放 / 上一步」逐步观察，速度可调。</span>
+              <span class="en">Inspect step by step with Step / Play / Back; the speed is adjustable.</span>
+            </li>
+            <li>
+              <span class="zh">在底部「代码驱动」标签页写伪代码，点「运行代码」后逐行高亮。</span>
+              <span class="en">Write pseudo-code in the Code tab and click Run Code to highlight each line.</span>
+            </li>
+            <li>
+              <span class="zh">粘贴完整 C 代码时先点「提取指令」，自动过滤 #include、printf、for 等无关代码后再运行。</span>
+              <span class="en">For full C code, click Extract first: #include, printf, for etc. are filtered out before running.</span>
+            </li>
+          </ol>
+        </section>
+
+        <section class="help-block">
+          <h3><span class="zh">参数与指针语义</span><span class="en">Parameters &amp; pointer conventions</span></h3>
+          <ul class="help-list">
+            <li>
+              <span class="zh">位序从 1 开始：插入取 1..length+1，删除/修改取 1..length；栈、队列、链表头插/尾插只需填值。</span>
+              <span class="en">Positions are 1-based: insert 1..length+1, delete/set 1..length; stack, queue and head/tail insert need only a value.</span>
+            </li>
+            <li>
+              <span class="zh">栈的 <code>top</code> 指向栈顶的下一个空位；队列为循环队列并牺牲一个单元；链表带头结点、结点地址不连续。</span>
+              <span class="en">Stack <code>top</code> points to the next free slot; the queue is circular and sacrifices one slot; the linked list has a head node with non-contiguous addresses.</span>
+            </li>
+            <li>
+              <span class="zh">二叉树按层序编号：根为第 1 号，第 i 号的左孩子为 2i、右孩子为 2i+1。</span>
+              <span class="en">Binary tree uses level-order numbering: root = 1, left child of i = 2i, right child = 2i+1.</span>
+            </li>
+          </ul>
+        </section>
+
+        <section class="help-block">
+          <h3><span class="zh">指令速查</span><span class="en">Cheat sheet</span></h3>
+
+          <p class="cheat__group"><span class="zh">数组</span><span class="en">Array</span></p>
+          <ul class="cheat">
+            <li><code>int arr[10] = {10, 20, 5};</code><span class="zh">声明并初始化</span><span class="en">declare &amp; initialize</span></li>
+            <li><code>arr[1] = 20;</code><span class="zh">修改（物理下标，0 起始）</span><span class="en">set (0-based index)</span></li>
+            <li><code>insert(arr, 2, 5);</code><span class="zh">在第 2 个位置插入</span><span class="en">insert at position 2</span></li>
+            <li><code>remove(arr, 1);</code><span class="zh">删除第 1 个</span><span class="en">delete element 1</span></li>
+            <li><code>search(arr, 5);</code><span class="zh">查找 5</span><span class="en">search 5</span></li>
+          </ul>
+
+          <p class="cheat__group"><span class="zh">链表</span><span class="en">Linked list</span></p>
+          <ul class="cheat">
+            <li><code>int L[8] = {10, 20, 30};</code><span class="zh">按尾插建表</span><span class="en">build with tail insertion</span></li>
+            <li><code>insert(L, 1, 5);</code><span class="zh">插到头结点之后</span><span class="en">insert after the head node</span></li>
+            <li><code>remove(L, 2);</code><span class="zh">删除第 2 个结点</span><span class="en">delete node 2</span></li>
+            <li><code>insertHead(L, 5);</code><span class="zh">头插法（O(1)）</span><span class="en">head insertion (O(1))</span></li>
+            <li><code>insertTail(L, 99);</code><span class="zh">尾插法（O(n)）</span><span class="en">tail insertion (O(n))</span></li>
+            <li><code>buildHead(L, 1, 2, 3);</code><span class="zh">建表，结果为 3→2→1</span><span class="en">build, yields 3→2→1</span></li>
+            <li><code>buildTail(L, 1, 2, 3);</code><span class="zh">建表，结果为 1→2→3</span><span class="en">build, yields 1→2→3</span></li>
+          </ul>
+
+          <p class="cheat__group"><span class="zh">栈 / 队列</span><span class="en">Stack / Queue</span></p>
+          <ul class="cheat">
+            <li><code>push(s, 7);</code><span class="zh">入栈</span><span class="en">push</span></li>
+            <li><code>pop(s);</code><span class="zh">出栈</span><span class="en">pop</span></li>
+            <li><code>enqueue(q, 7);</code><span class="zh">入队</span><span class="en">enqueue</span></li>
+            <li><code>dequeue(q);</code><span class="zh">出队</span><span class="en">dequeue</span></li>
+          </ul>
+
+          <p class="cheat__group"><span class="zh">二叉树</span><span class="en">Binary tree</span></p>
+          <ul class="cheat">
+            <li><code>int T[15] = {10, 20, 30};</code><span class="zh">按层序建树</span><span class="en">build by level order</span></li>
+            <li><code>insertLeft(T, 2, 5);</code><span class="zh">给第 2 号挂左孩子</span><span class="en">attach left child to node 2</span></li>
+            <li><code>insertRight(T, 2, 6);</code><span class="zh">挂右孩子</span><span class="en">attach a right child</span></li>
+            <li><code>remove(T, 2);</code><span class="zh">删除子树</span><span class="en">delete subtree</span></li>
+            <li><code>preorder(T); / inorder(T); / postorder(T); / levelorder(T);</code><span class="zh">四种遍历</span><span class="en">four traversals</span></li>
+          </ul>
+
+          <p class="cheat__group"><span class="zh">简写（省略变量名）</span><span class="en">Shorthand</span></p>
+          <ul class="cheat">
+            <li><code>set(2, 99);</code><span class="zh">物理下标赋值</span><span class="en">set by index</span></li>
+            <li><code>insert(2, 99);</code><span class="zh">按位序插入</span><span class="en">insert by position</span></li>
+            <li><code>remove(1);</code><span class="zh">删除第 1 个</span><span class="en">delete element 1</span></li>
+            <li><code>insertHead(5);</code><span class="zh">头插</span><span class="en">head insert</span></li>
+            <li><code>buildTail(1, 2, 3);</code><span class="zh">尾插建表</span><span class="en">tail build</span></li>
+          </ul>
+        </section>
+
+        <section class="help-block">
+          <h3><span class="zh">图例</span><span class="en">Legend</span></h3>
+          <ul class="legend">
+            <li><span class="swatch swatch--alloc"></span><span class="zh">已分配内存（存储元素）</span><span class="en">Allocated memory</span></li>
+            <li><span class="swatch swatch--free"></span><span class="zh">空闲内存</span><span class="en">Free memory</span></li>
+            <li><span class="swatch swatch--hl"></span><span class="zh">当前操作位置</span><span class="en">Current operation</span></li>
+            <li><span class="swatch swatch--freed"></span><span class="zh">已删除（内存未回收）</span><span class="en">Deleted (memory kept)</span></li>
+            <li><span class="swatch swatch--ptr"></span><span class="zh">结构指针（top / front / rear / head / next / lchild / rchild）</span><span class="en">Structure pointer (top / front / rear / head / next / lchild / rchild)</span></li>
+          </ul>
+        </section>
+      </div>
+    </aside>
+  </div>
 
   <script type="module" src="js/main.js"></script>
 </body>
