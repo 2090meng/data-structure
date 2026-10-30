@@ -9,7 +9,7 @@ import { ArrayDS } from '../js/structures/ArrayDS.js';
 import { StackDS } from '../js/structures/StackDS.js';
 import { QueueDS } from '../js/structures/QueueDS.js';
 import { CommandParser } from '../js/core/CommandParser.js';
-import { STEP } from '../js/core/Step.js';
+import { applySteps } from './helpers/steps.js';
 
 let pass = 0;
 let fail = 0;
@@ -21,39 +21,6 @@ function assert(name, cond, detail = '') {
   } else {
     fail++;
     console.log('  [FAIL] ' + name + (detail ? ' — ' + detail : ''));
-  }
-}
-
-/** 在无渲染环境下“执行”一组 Step，只演进内存与结构状态。 */
-function applySteps(mem, steps) {
-  for (const s of steps) {
-    const p = s.payload || {};
-    switch (s.type) {
-      case STEP.MOVE_VALUE: {
-        const v = mem.read(p.from);
-        mem.clear(p.from);
-        mem.write(p.to, v);
-        break;
-      }
-      case STEP.SET_VALUE:
-        mem.write(p.block, p.value);
-        break;
-      case STEP.CLEAR_VALUE:
-        mem.clear(p.block);
-        break;
-      case STEP.SWAP: {
-        const va = mem.read(p.a);
-        const vb = mem.read(p.b);
-        mem.write(p.a, vb);
-        mem.write(p.b, va);
-        break;
-      }
-      case STEP.META:
-        if (typeof p.run === 'function') p.run();
-        break;
-      default:
-        break;
-    }
   }
 }
 

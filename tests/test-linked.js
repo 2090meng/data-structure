@@ -15,7 +15,7 @@
  *   I 教材步骤顺序与日志文案（s->next / p->next / q->next / free(q)）
  *   J~Q 头插法 / 尾插法 / 建表 / 上限防御 / 代码模式 / 指令提取
  *
- * H 部分沿用 test-stack-queue.js 的轻量“假 DOM”，不用浏览器即可验证真实渲染路径。
+ * H 部分使用 tests/helpers 的轻量“假 DOM”，不用浏览器即可验证真实渲染路径。
  */
 import { MemoryModel } from '../js/core/MemoryModel.js';
 import { LinkedListDS } from '../js/structures/LinkedListDS.js';
@@ -24,6 +24,8 @@ import { Animator } from '../js/animation/Animator.js';
 import { CommandParser } from '../js/core/CommandParser.js';
 import { Preprocessor } from '../js/core/Preprocessor.js';
 import { STEP } from '../js/core/Step.js';
+import { FakeEl, installFakeDOM, texts, els } from './helpers/fake-dom.js';
+import { applySteps } from './helpers/steps.js';
 
 // ---------- 断言工具：同时打印预期结果与实际结果 ----------
 let pass = 0;
@@ -38,85 +40,12 @@ function assertEq(name, actual, expected) {
   console.log(`         实际: ${JSON.stringify(actual)}`);
 }
 
-// ---------- 假 DOM（只实现 Renderer 用到的几个方法） ----------
-class FakeEl {
-  constructor(tag) {
-    this.tag = tag;
-    this.attrs = {};
-    this.children = [];
-    this.textContent = '';
-    this.style = {};
-    this.parent = null;
-  }
-  setAttribute(k, v) { this.attrs[k] = String(v); }
-  appendChild(child) { child.parent = this; this.children.push(child); return child; }
-  removeChild(child) {
-    const i = this.children.indexOf(child);
-    if (i >= 0) this.children.splice(i, 1);
-    return child;
-  }
-  remove() { if (this.parent) this.parent.removeChild(this); }
-  get firstChild() { return this.children[0] || null; }
-  get clientWidth() { return 1280; }
-}
-globalThis.document = { createElementNS: (_ns, tag) => new FakeEl(tag) };
-
-function walk(el, cb) {
-  cb(el);
-  for (const c of el.children) walk(c, cb);
-}
-
-/** 取出画布中带指定 class 的文字内容（按绘制顺序）。 */
-function texts(svg, classes) {
-  const want = Array.isArray(classes) ? classes : [classes];
-  const out = [];
-  walk(svg, (e) => {
-    if (e.tag !== 'text') return;
-    const cls = String(e.attrs.class || '').split(' ');
-    if (want.some((c) => cls.includes(c))) out.push(e.textContent);
-  });
-  return out;
-}
-
-/** 取出某 class 的元素（rect / line / path）。 */
-function els(svg, tag, cls) {
-  const out = [];
-  walk(svg, (e) => {
-    if (e.tag !== tag) return;
-    if (String(e.attrs.class || '').split(' ').includes(cls)) out.push(e);
-  });
-  return out;
-}
+// ---------- 假 DOM 与执行辅助（tests/helpers 共享） ----------
+installFakeDOM();
 
 /** 链表 next 箭头数量（相邻直线 + 跨块折线）。 */
 function linkCount(svg) {
   return els(svg, 'line', 'mem-link').length + els(svg, 'path', 'mem-link').length;
-}
-
-// ---------- 执行辅助：与 Animator 保持一致地演进内存 ----------
-function applySteps(mem, steps) {
-  for (const s of steps) {
-    const p = s.payload || {};
-    switch (s.type) {
-      case STEP.MOVE_VALUE: {
-        const v = mem.read(p.from);
-        mem.clear(p.from);
-        mem.write(p.to, v);
-        break;
-      }
-      case STEP.SET_VALUE:
-        mem.write(p.block, p.value);
-        break;
-      case STEP.CLEAR_VALUE:
-        mem.clear(p.block);
-        break;
-      case STEP.META:
-        if (typeof p.run === 'function') p.run();
-        break;
-      default:
-        break;
-    }
-  }
 }
 
 /** 逻辑顺序上的数据值（chain 数组顺序）。 */

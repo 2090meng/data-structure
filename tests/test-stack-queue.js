@@ -24,6 +24,8 @@ import { Renderer } from '../js/render/Renderer.js';
 import { Animator } from '../js/animation/Animator.js';
 import { CommandParser } from '../js/core/CommandParser.js';
 import { STEP } from '../js/core/Step.js';
+import { FakeEl, installFakeDOM, walk, texts, valueTextAt } from './helpers/fake-dom.js';
+import { applySteps } from './helpers/steps.js';
 
 // ---------- 断言工具：同时打印预期结果与实际结果 ----------
 let pass = 0;
@@ -38,90 +40,8 @@ function assertEq(name, actual, expected) {
   console.log(`         实际: ${JSON.stringify(actual)}`);
 }
 
-// ---------- 假 DOM（只实现 Renderer 用到的几个方法） ----------
-class FakeEl {
-  constructor(tag) {
-    this.tag = tag;
-    this.attrs = {};
-    this.children = [];
-    this.textContent = '';
-    this.style = {};
-    this.parent = null;
-  }
-  setAttribute(k, v) { this.attrs[k] = String(v); }
-  appendChild(child) { child.parent = this; this.children.push(child); return child; }
-  removeChild(child) {
-    const i = this.children.indexOf(child);
-    if (i >= 0) this.children.splice(i, 1);
-    return child;
-  }
-  remove() { if (this.parent) this.parent.removeChild(this); }
-  get firstChild() { return this.children[0] || null; }
-  get clientWidth() { return 1280; }
-}
-globalThis.document = { createElementNS: (_ns, tag) => new FakeEl(tag) };
-
-function walk(el, cb) {
-  cb(el);
-  for (const c of el.children) walk(c, cb);
-}
-
-/** 取出画布中某类文字（如 mem-ptr 指针标注）。 */
-function texts(svg, cls) {
-  const out = [];
-  walk(svg, (e) => {
-    if (e.tag === 'text' && String(e.attrs.class || '').split(' ').includes(cls)) {
-      out.push(e.textContent);
-    }
-  });
-  return out;
-}
-
-/** 取出某个块中心显示的值文字（'30' 或 '∅'）。 */
-function valueTextAt(svg, pos) {
-  const out = [];
-  if (!pos) return out;
-  walk(svg, (e) => {
-    if (e.tag !== 'text') return;
-    if (Number(e.attrs.x) !== pos.cx || Number(e.attrs.y) !== pos.cy) return;
-    const cls = String(e.attrs.class || '');
-    if (cls === 'mem-value' || cls === 'mem-empty') out.push(e.textContent);
-  });
-  return out;
-}
-
-// ---------- 执行辅助：与 Animator 保持一致地演进内存 ----------
-function applySteps(mem, steps) {
-  for (const s of steps) {
-    const p = s.payload || {};
-    switch (s.type) {
-      case STEP.MOVE_VALUE: {
-        const v = mem.read(p.from);
-        mem.clear(p.from);
-        mem.write(p.to, v);
-        break;
-      }
-      case STEP.SET_VALUE:
-        mem.write(p.block, p.value);
-        break;
-      case STEP.CLEAR_VALUE:
-        mem.clear(p.block);
-        break;
-      case STEP.SWAP: {
-        const va = mem.read(p.a);
-        const vb = mem.read(p.b);
-        mem.write(p.a, vb);
-        mem.write(p.b, va);
-        break;
-      }
-      case STEP.META:
-        if (typeof p.run === 'function') p.run();
-        break;
-      default:
-        break;
-    }
-  }
-}
+// ---------- 假 DOM 与执行辅助（tests/helpers 共享） ----------
+installFakeDOM();
 
 /** 栈内元素（栈底 -> 栈顶）。 */
 function stackValues(st, mem) {

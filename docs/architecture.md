@@ -65,11 +65,11 @@ node tests/test-binarytree.js
 index.html                 页面骨架：应用栏、结构标签、舞台、停靠区、抽屉、手机栏、设备选择页
 css/style.css              设计令牌 + 布局 + 组件 + SVG 样式 + 响应式
 js/main.js                 应用入口 / 控制器：DOM、结构切换、执行、代码模式、外壳交互
-js/i18n.js                 动态文案双语取值
 js/core/Step.js            Step 契约与 makeStep
 js/core/MemoryModel.js     抽象内存：块、地址分配、读写、快照/恢复
 js/core/CommandParser.js   代码模式解析器（C 风格伪代码 → 指令 → Step）
 js/core/Preprocessor.js    完整 C 代码的白名单提取与 for 移位模式识别
+js/core/i18n.js            动态文案双语取值
 js/animation/Animator.js   动画引擎：装载、单步、自动播放、撤销、回滚
 js/render/Renderer.js      SVG 渲染器：网格/竖排/链表/树四种布局
 js/structures/ArrayDS.js       数组（连续内存）
@@ -78,6 +78,7 @@ js/structures/StackDS.js       顺序栈
 js/structures/QueueDS.js       循环队列
 js/structures/BinaryTreeDS.js  二叉链表
 tests/test*.js             四套 Node 自检
+tests/helpers/             共享测试辅助：假 DOM、Step 执行器
 docs/architecture.md       本文件：架构与开发标准
 README.md                  项目简介与运行说明
 miniprogram/               微信小程序 web-view 容器工程

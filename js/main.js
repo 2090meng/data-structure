@@ -7,7 +7,7 @@
  * 当前支持四种结构：数组 Array / 链表 Linked List / 栈 Stack / 队列 Queue。
  * 切换结构会重建内存与结构对象，操作项（下拉框）随之动态变化。
  */
-import { i18n } from './i18n.js';
+import { i18n } from './core/i18n.js';
 import { MemoryModel } from './core/MemoryModel.js';
 import { Renderer } from './render/Renderer.js';
 import { Animator } from './animation/Animator.js';
