@@ -1178,6 +1178,8 @@ body.mode-mobile .brand__subtitle { display: none; }
 body.mode-mobile .brand__mark { width: 32px; height: 32px; font-size: 13px; }
 body.mode-mobile .brand__title { font-size: 15px; }
 body.mode-mobile .appbar__actions .btn--ghost { padding: 6px 8px; font-size: 11.5px; }
+/* 手机端底部栏已提供「说明」，隐藏顶部重复入口 */
+body.mode-mobile #help-btn { display: none; }
 
 body.mode-mobile .workspace {
   display: flex;
@@ -1272,7 +1274,9 @@ body.mode-mobile .code-view {
 
   .brand__title {
     font-size: 15px;
-    white-space: normal;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
 
   .brand__subtitle {
