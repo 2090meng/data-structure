@@ -54,6 +54,7 @@ node tests/test-binarytree.js
 index.html              页面入口
 css/style.css           主题、布局与 SVG 样式
 js/main.js              应用控制器
+js/ui/                  结构配置、设备形态与手机面板
 js/core/                内存模型、Step 契约、代码解析与预处理
 js/animation/           动画引擎
 js/render/              SVG 渲染器

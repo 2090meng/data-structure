@@ -65,6 +65,8 @@ node tests/test-binarytree.js
 index.html                 页面骨架：应用栏、结构标签、舞台、停靠区、抽屉、手机栏、设备选择页
 css/style.css              设计令牌 + 布局 + 组件 + SVG 样式 + 响应式
 js/main.js                 应用入口 / 控制器：DOM、结构切换、执行、代码模式、外壳交互
+js/ui/catalog.js           结构配置：默认容量、操作项、示例代码、结构说明
+js/ui/device.js            设备选择页、电脑/手机形态、手机端底部面板
 js/core/Step.js            Step 契约与 makeStep
 js/core/MemoryModel.js     抽象内存：块、地址分配、读写、快照/恢复
 js/core/CommandParser.js   代码模式解析器（C 风格伪代码 → 指令 → Step）
@@ -389,7 +391,7 @@ search(T, 50);
 ### 8.5 新增结构时的界面接入点
 
 1. `index.html`：顶部 `#structure-tabs` 增加 `<button data-structure="xxx">`；`#structure-select`（兼容用隐藏 select）补 `<option>`
-2. `js/main.js`：`DEFAULT_CAPACITY`、`OPS`、`SAMPLES`、`STRUCT_NOTE` 各补一条
+2. `js/ui/catalog.js`：`DEFAULT_CAPACITY`、`OPS`、`SAMPLES`、`STRUCT_NOTE` 各补一条
 3. 说明抽屉可补对应“指令速查”段落（可选）
 
 ---
@@ -405,11 +407,11 @@ search(T, 50);
    - `plan*` 只产出 Step；指针/元数据变化放入 `META { run, undo }`
    - `view()` 返回 `{ layout, title, pointers }`，`layout` 取值 `grid` / `column` / `linked` / `tree`
    - 形态会变的结构补 `planningContext()`
-2. **入口** `js/main.js`
-   - `import` 新类；`createStructure()` 增加分支
-   - `DEFAULT_CAPACITY`、`OPS`、`SAMPLES`、`STRUCT_NOTE` 增加配置
-   - `syncFields()` 的 `needIndex` / `needValue` 判断补充新操作
-   - `execute()` 增加对应分支与参数校验
+2. **入口** `js/main.js` + `js/ui/catalog.js`
+   - `js/main.js`：`import` 新类；`createStructure()` 增加分支
+   - `js/ui/catalog.js`：`DEFAULT_CAPACITY`、`OPS`、`SAMPLES`、`STRUCT_NOTE` 增加配置
+   - `js/main.js`：`syncFields()` 的 `needIndex` / `needValue` 判断补充新操作
+   - `js/main.js`：`execute()` 增加对应分支与参数校验
 3. **代码模式** `js/core/CommandParser.js`
    - `_parseStmt` 增加指令语法（完整形式 + 简写）
    - `buildSteps` 增加 `case`，按 `kind` 分派

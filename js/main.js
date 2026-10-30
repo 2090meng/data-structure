@@ -4,8 +4,9 @@
  * 职责：绑定界面事件，把用户输入转成操作指令，
  * 串联「数据结构层 → 动画层 → 渲染层」三部分，并维护日志与语言状态。
  *
- * 当前支持四种结构：数组 Array / 链表 Linked List / 栈 Stack / 队列 Queue。
+ * 当前支持五种结构：数组 Array / 链表 Linked List / 栈 Stack / 队列 Queue / 二叉树 Binary Tree。
  * 切换结构会重建内存与结构对象，操作项（下拉框）随之动态变化。
+ * 结构配置在 ui/catalog.js，设备形态与手机面板在 ui/device.js。
  */
 import { i18n } from './core/i18n.js';
 import { MemoryModel } from './core/MemoryModel.js';
@@ -18,6 +19,8 @@ import { StackDS } from './structures/StackDS.js';
 import { QueueDS } from './structures/QueueDS.js';
 import { CommandParser } from './core/CommandParser.js';
 import { Preprocessor } from './core/Preprocessor.js';
+import { SPEED_MAP, DEFAULT_CAPACITY, OPS, SAMPLES, STRUCT_NOTE } from './ui/catalog.js';
+import { initDeviceUI } from './ui/device.js';
 
 // ---------- 1. 初始化语言 ----------
 i18n.setLang('zh');
@@ -52,13 +55,8 @@ const helpBtn = document.getElementById('help-btn');
 const helpDrawer = document.getElementById('help-drawer');
 const noteZh = document.getElementById('note-zh');
 const noteEn = document.getElementById('note-en');
-// 设备选择页与手机端底部面板
-const entryGate = document.getElementById('entry');
-const deviceBtn = document.getElementById('device-btn');
+// 设备选择页里的语言选择（设备面板本身由 ui/device.js 接管）
 const gateLang = document.getElementById('gate-lang');
-const sidebar = document.getElementById('sidebar');
-const mobileBar = document.getElementById('mobile-bar');
-const sheetBackdrop = document.getElementById('sheet-backdrop');
 
 // ---------- 3. 创建核心对象 ----------
 let memory = new MemoryModel();
@@ -74,147 +72,6 @@ const animator = new Animator(
   (msg) => addLog({ zh: '执行出错：' + msg, en: 'Error: ' + msg }, true),
   (busy) => setBusy(busy)
 );
-
-// 速度档位（毫秒）→ 与 HTML 中 speed-select 的 option value 对应
-const SPEED_MAP = { slow: 800, normal: 400, fast: 100, instant: 0 };
-
-// 各结构的默认容量
-const DEFAULT_CAPACITY = { array: 8, linked: 8, stack: 8, queue: 6, binarytree: 15 };
-
-// 各结构支持的操作项（value -> 中英标签）
-const OPS = {
-  array: [
-    ['insert', '插入 Insert'],
-    ['delete', '删除 Delete'],
-    ['set', '修改/赋值 Set'],
-    ['search', '查找 Search'],
-  ],
-  linked: [
-    ['insert', '插入 Insert'],
-    ['insertHead', '头插法 Head Insert'],
-    ['insertTail', '尾插法 Tail Insert'],
-    ['delete', '删除 Delete'],
-    ['search', '查找 Search'],
-  ],
-  stack: [
-    ['push', '入栈 Push'],
-    ['pop', '出栈 Pop'],
-    ['peek', '取栈顶 Peek'],
-    ['search', '查找 Search'],
-  ],
-  queue: [
-    ['enqueue', '入队 Enqueue'],
-    ['dequeue', '出队 Dequeue'],
-    ['front', '查看队头 Front'],
-    ['search', '查找 Search'],
-  ],
-  binarytree: [
-    ['insertLeft', '插入左孩子 Insert Left'],
-    ['insertRight', '插入右孩子 Insert Right'],
-    ['delete', '删除子树 Delete'],
-    ['search', '查找 Search'],
-    ['preorder', '先序遍历 Preorder'],
-    ['inorder', '中序遍历 Inorder'],
-    ['postorder', '后序遍历 Postorder'],
-    ['levelorder', '层次遍历 Level-order'],
-  ],
-};
-
-// 各结构的示例代码
-const SAMPLES = {
-  array: `#include <stdio.h>
-
-int main() {
-    // 1. 初始化一个容量为 8 的数组，目前有 5 个有效元素
-    int arr[8] = {10, 20, 30, 40, 50};
-    int length = 5;
-    int capacity = 8;
-
-    // 操作 1：在下标 2（即第 3 个位置）插入元素 99
-    for (int i = length; i > 2; i--) {
-        arr[i] = arr[i - 1]; // 从后往前挪，腾出空间
-    }
-    arr[2] = 99;
-    length++; // 长度加 1
-
-    // 操作 2：删除第 2 个元素（下标 1，即 20）
-    for (int i = 1; i < length - 1; i++) {
-        arr[i] = arr[i + 1]; // 从前往后挪，覆盖被删除的元素
-    }
-    length--; // 长度减 1
-
-    // 打印最终结果（打印语句会被忽略）
-    printf("最终数组内容: ");
-    for (int i = 0; i < length; i++) {
-        printf("%d ", arr[i]);
-    }
-    printf("\\n");
-
-    return 0;
-}`,
-  linked: `#include <stdio.h>
-
-int main() {
-    // 单链表：带头结点，每个结点单独 malloc，地址不连续
-    int L[8] = {10, 20, 30};   // 尾插法依次建立 10 -> 20 -> 30
-
-    insertHead(L, 5);   // 头插法：s->next = L->next; L->next = s;  链表变 5 -> 10 -> 20 -> 30
-    insertTail(L, 99);  // 尾插法：p 走到表尾；s->next = NULL; p->next = s;
-    insert(L, 3, 88);   // 在第 3 个位置前插入 88
-    remove(L, 2);       // 删除第 2 个结点：p->next = q->next; free(q);
-    search(L, 30);      // p = p->next 逐个比较
-
-    printf("演示结束（打印语句会被忽略）\\n");
-    return 0;
-}`,
-  stack: `#include <stdio.h>
-
-int main() {
-    // 顺序栈：MaxSize = 8，S.top 指向下一个空位，后进先出 LIFO
-    int st[8] = {10, 20, 30};
-
-    push(st, 40);   // S.data[S.top] = 40; S.top++（栈顶指针上移）
-    push(st, 50);   // S.data[S.top] = 50; S.top++
-    pop(st);        // S.top--; e = S.data[S.top]（弹出 50）
-    push(st, 60);   // S.data[S.top] = 60; S.top++
-
-    printf("演示结束（打印语句会被忽略）\\n");
-    return 0;
-}`,
-  queue: `#include <stdio.h>
-
-int main() {
-    // 循环队列：MaxSize = 7，牺牲一个单元判满，最多存 6 个元素
-    int q[7] = {10, 20, 30};
-
-    enqueue(q, 40);  // 入队：Q.data[Q.rear] = 40; Q.rear++
-    dequeue(q);      // 出队：e = Q.data[Q.front]; Q.front++
-    enqueue(q, 50);  // 入队 50
-    enqueue(q, 60);  // 入队 60
-
-    printf("演示结束（打印语句会被忽略）\\n");
-    return 0;
-}`,
-  binarytree: `#include <stdio.h>
-
-int main() {
-    // 二叉链表：每个结点单独 malloc，lchild / rchild 分别指向左右孩子
-    // 初始化按层序序列建树：根 = 10，左孩子 20、右孩子 30，依此类推
-    int T[15] = {10, 20, 30, 40, 50, 60, 70};
-
-    insertLeft(T, 4, 80);   // 第 4 号结点（40）挂左孩子，成为第 8 号
-    insertRight(T, 4, 90);  // 第 4 号结点（40）挂右孩子，成为第 9 号
-    preorder(T);            // 先序遍历：根 → 左 → 右
-    inorder(T);             // 中序遍历：左 → 根 → 右
-    postorder(T);           // 后序遍历：左 → 右 → 根
-    levelorder(T);          // 层次遍历：逐层从左到右
-    search(T, 50);          // 先序查找
-    remove(T, 2);           // 删除以第 2 号结点为根的整棵子树
-
-    printf("演示结束（打印语句会被忽略）\\n");
-    return 0;
-}`,
-};
 
 // ---------- 4. 工具函数 ----------
 /** 向日志区追加一条步骤说明（自动按当前语言翻译）。isError 为真时红色高亮。 */
@@ -323,30 +180,6 @@ function switchStructure(kind) {
 }
 
 // ---------- 5.5 界面外壳：结构标签 / 结构说明 / 主题 / 说明抽屉 ----------
-// 每个结构在舞台标题下的一句话说明（新增结构时只需在这里补一条）。
-const STRUCT_NOTE = {
-  array: {
-    zh: '顺序存储：地址连续，插入删除需要移动元素',
-    en: 'Sequential storage: contiguous addresses, insert/delete shifts elements',
-  },
-  linked: {
-    zh: '链式存储：结点分散，靠 next 指针串成一条链',
-    en: 'Linked storage: scattered nodes chained by next pointers',
-  },
-  stack: {
-    zh: '后进先出：top 指向栈顶的下一个空位',
-    en: 'LIFO: top points to the next free slot',
-  },
-  queue: {
-    zh: '先进先出：循环队列，牺牲一个单元区分队空/队满',
-    en: 'FIFO: circular queue, one slot sacrificed to distinguish empty/full',
-  },
-  binarytree: {
-    zh: '二叉链表：lchild / rchild 指针，按层序编号定位结点',
-    en: 'Linked binary tree: lchild/rchild pointers, level-order node numbering',
-  },
-};
-
 /** 同步顶部结构标签的选中态与舞台的结构说明。 */
 function syncStructureChrome(kind) {
   if (structureTabs) {
@@ -660,7 +493,7 @@ helpDrawer.querySelectorAll('[data-close]').forEach((el) => {
 document.addEventListener('keydown', (event) => {
   if (event.key === 'Escape') {
     setDrawer(false);
-    closeSheets();
+    deviceUI.closeSheets();
   }
 });
 
@@ -727,94 +560,21 @@ if (dock && dockResizer) {
 }
 
 // ---------- 8.5 设备选择（电脑端 / 手机端）与手机端底部面板 ----------
-let activeSheet = null;   // 当前展开的底部面板：'ops' | 'log' | 'code'
-
-/** 收起所有手机端底部面板。 */
-function closeSheets() {
-  if (!sidebar || !dock) return;
-  sidebar.classList.remove('is-open');
-  dock.classList.remove('is-open');
-  sheetBackdrop.classList.remove('is-open');
-  document.body.classList.remove('sheet-open');
-  if (mobileBar) {
-    for (const btn of mobileBar.querySelectorAll('.mobile-bar__btn')) {
-      btn.classList.remove('is-active');
-    }
-  }
-  activeSheet = null;
-}
-
-/** 展开指定底部面板；再次点同一个按钮则收起。 */
-function openSheet(name) {
-  if (name === 'help') {
-    closeSheets();
-    setDrawer(true);
-    return;
-  }
-  if (activeSheet === name) {
-    closeSheets();
-    return;
-  }
-  closeSheets();
-
-  if (name === 'ops') {
-    sidebar.classList.add('is-open');
-    sidebar.scrollTop = 0;
-  } else {
-    showDockPanel(name === 'log' ? 'log' : 'code');
-    dock.classList.add('is-open');
-  }
-
-  document.body.classList.add('sheet-open');
-  sheetBackdrop.classList.add('is-open');
-  activeSheet = name;
-  for (const btn of mobileBar.querySelectorAll('.mobile-bar__btn')) {
-    btn.classList.toggle('is-active', btn.dataset.sheet === name);
-  }
-}
-
-/**
- * 切换电脑 / 手机形态：手机端使用单列布局，操作栏与日志/代码区变为底部面板。
- * 每次进入都会重新询问，不写入 localStorage。
- */
-function setDevice(mode) {
-  const mobile = mode === 'mobile';
-  document.body.classList.toggle('mode-mobile', mobile);
-  document.body.classList.toggle('mode-desktop', !mobile);
-  entryGate.classList.remove('is-open');
-  setDrawer(false);
-  closeSheets();
-  dock.style.height = '';   // 清掉桌面端拖拽留下的内联高度
-  requestAnimationFrame(() => {
-    renderer.render(memory);
-    const canvas = document.querySelector('.canvas');
-    if (canvas) {
-      canvas.scrollTop = 0;
-      canvas.scrollLeft = 0;
-    }
-  });
-}
-
-entryGate.addEventListener('click', (event) => {
-  const option = event.target.closest('[data-mode]');
-  if (option) setDevice(option.dataset.mode);
+const deviceUI = initDeviceUI({
+  setDrawer,
+  showDockPanel,
+  // 形态切换后重新绘制，并把画布滚动位置归零
+  onChange: () => {
+    requestAnimationFrame(() => {
+      renderer.render(memory);
+      const canvas = document.querySelector('.canvas');
+      if (canvas) {
+        canvas.scrollTop = 0;
+        canvas.scrollLeft = 0;
+      }
+    });
+  },
 });
-
-// 右上角「切换设备」重新打开选择页
-deviceBtn.addEventListener('click', () => {
-  setDrawer(false);
-  closeSheets();
-  entryGate.classList.add('is-open');
-});
-
-// 手机端底部操作栏
-mobileBar.addEventListener('click', (event) => {
-  const btn = event.target.closest('[data-sheet]');
-  if (btn) openSheet(btn.dataset.sheet);
-});
-
-// 点遮罩收起底部面板
-sheetBackdrop.addEventListener('click', () => closeSheets());
 
 // 选择页里的语言切换与顶部语言选择保持同步
 gateLang.addEventListener('change', () => {
