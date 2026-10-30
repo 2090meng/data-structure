@@ -1,7 +1,7 @@
 /**
  * test-linked.js — 单链表（带头结点）全面自动化自检。
  *
- * 运行：node test-linked.js
+ * 运行：node tests/test-linked.js
  *
  * 覆盖：
  *   A 初始化：只分配头结点、空表指针与防御
@@ -17,13 +17,13 @@
  *
  * H 部分沿用 test-stack-queue.js 的轻量“假 DOM”，不用浏览器即可验证真实渲染路径。
  */
-import { MemoryModel } from './js/core/MemoryModel.js';
-import { LinkedListDS } from './js/structures/LinkedListDS.js';
-import { Renderer } from './js/render/Renderer.js';
-import { Animator } from './js/animation/Animator.js';
-import { CommandParser } from './js/core/CommandParser.js';
-import { Preprocessor } from './js/core/Preprocessor.js';
-import { STEP } from './js/core/Step.js';
+import { MemoryModel } from '../js/core/MemoryModel.js';
+import { LinkedListDS } from '../js/structures/LinkedListDS.js';
+import { Renderer } from '../js/render/Renderer.js';
+import { Animator } from '../js/animation/Animator.js';
+import { CommandParser } from '../js/core/CommandParser.js';
+import { Preprocessor } from '../js/core/Preprocessor.js';
+import { STEP } from '../js/core/Step.js';
 
 // ---------- 断言工具：同时打印预期结果与实际结果 ----------
 let pass = 0;

@@ -1,7 +1,7 @@
 /**
  * test-stack-queue.js — 栈 / 队列 全面自动化自检。
  *
- * 运行：node test-stack-queue.js
+ * 运行：node tests/test-stack-queue.js
  *
  * 覆盖：
  *   A 栈：连续压入 10/20/30 后弹出一次（后进先出）
@@ -17,13 +17,13 @@
  * G 部分用极轻量的“假 DOM”驱动【真实的】Renderer 与 Animator，
  * 因此无需浏览器即可验证真实的渲染与日志代码路径。
  */
-import { MemoryModel } from './js/core/MemoryModel.js';
-import { StackDS } from './js/structures/StackDS.js';
-import { QueueDS } from './js/structures/QueueDS.js';
-import { Renderer } from './js/render/Renderer.js';
-import { Animator } from './js/animation/Animator.js';
-import { CommandParser } from './js/core/CommandParser.js';
-import { STEP } from './js/core/Step.js';
+import { MemoryModel } from '../js/core/MemoryModel.js';
+import { StackDS } from '../js/structures/StackDS.js';
+import { QueueDS } from '../js/structures/QueueDS.js';
+import { Renderer } from '../js/render/Renderer.js';
+import { Animator } from '../js/animation/Animator.js';
+import { CommandParser } from '../js/core/CommandParser.js';
+import { STEP } from '../js/core/Step.js';
 
 // ---------- 断言工具：同时打印预期结果与实际结果 ----------
 let pass = 0;

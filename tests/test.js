@@ -2,14 +2,14 @@
  * test.js — 纯逻辑自测脚本（不涉及 DOM / 渲染）。
  *
  * 只引入 structures 与 core 中的核心类，验证数组的赋值覆盖、插入后移、
- * 删除前移、以及越界时的防御性报错。运行方式：node test.js
+ * 删除前移、以及越界时的防御性报错。运行方式：node tests/test.js
  */
-import { MemoryModel } from './js/core/MemoryModel.js';
-import { ArrayDS } from './js/structures/ArrayDS.js';
-import { StackDS } from './js/structures/StackDS.js';
-import { QueueDS } from './js/structures/QueueDS.js';
-import { CommandParser } from './js/core/CommandParser.js';
-import { STEP } from './js/core/Step.js';
+import { MemoryModel } from '../js/core/MemoryModel.js';
+import { ArrayDS } from '../js/structures/ArrayDS.js';
+import { StackDS } from '../js/structures/StackDS.js';
+import { QueueDS } from '../js/structures/QueueDS.js';
+import { CommandParser } from '../js/core/CommandParser.js';
+import { STEP } from '../js/core/Step.js';
 
 let pass = 0;
 let fail = 0;

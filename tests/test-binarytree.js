@@ -1,7 +1,7 @@
 /**
  * test-binarytree.js — 二叉树（二叉链表）全面自动化自检。
  *
- * 运行：node test-binarytree.js
+ * 运行：node tests/test-binarytree.js
  *
  * 覆盖：
  *   A 空树初始化与防御
@@ -15,13 +15,13 @@
  *   I 教材步骤顺序与日志文案（T = s / p->lchild = s / 删除子树）
  *   J Preprocessor 对二叉树指令的提取
  */
-import { MemoryModel } from './js/core/MemoryModel.js';
-import { BinaryTreeDS } from './js/structures/BinaryTreeDS.js';
-import { Renderer } from './js/render/Renderer.js';
-import { Animator } from './js/animation/Animator.js';
-import { CommandParser } from './js/core/CommandParser.js';
-import { Preprocessor } from './js/core/Preprocessor.js';
-import { STEP } from './js/core/Step.js';
+import { MemoryModel } from '../js/core/MemoryModel.js';
+import { BinaryTreeDS } from '../js/structures/BinaryTreeDS.js';
+import { Renderer } from '../js/render/Renderer.js';
+import { Animator } from '../js/animation/Animator.js';
+import { CommandParser } from '../js/core/CommandParser.js';
+import { Preprocessor } from '../js/core/Preprocessor.js';
+import { STEP } from '../js/core/Step.js';
 
 // ---------- 断言工具：同时打印预期结果与实际结果 ----------
 let pass = 0;
